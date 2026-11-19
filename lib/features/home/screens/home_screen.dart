@@ -1,0 +1,940 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_redux/flutter_redux.dart';
+
+import 'dart:ui';
+
+import '../../../redux/app_state.dart';
+import '../../auth/redux/auth_actions.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Mindful Daily Dashboard',
+      theme: ThemeData(fontFamily: 'Roboto', useMaterial3: true),
+      home: const HomeScreen(),
+    );
+  }
+}
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _currentBottomNavIndex = 0;
+  int _selectedMoodIndex = 2; // Default to "Steady"
+  bool _showQuote = true;
+
+  // --- Exact Colors from Image ---
+  static const Color heroGradientStart = Color(0xFF2A3C50);
+  static const Color heroGradientEnd = Color(0xFF1B2838);
+  static const Color heroInnerCardBg = Color(0xFF33465A);
+  static const Color primaryTextBlue = Color(0xFF1E293B);
+  static const Color secondaryTextBlue = Color(0xFF64748B);
+  static const Color accentBlue = Color(0xFF4A90E2);
+  static const Color chipBlueBg = Color(0xFFE8F1F8);
+  static const Color cardWhite = Colors.white;
+
+  final List<Map<String, String>> _moods = [
+    {
+      'emoji': '😴',
+      'label': 'Tired',
+      'quote':
+          'Rest is not idleness — it\'s how we recharge for our best work.',
+    },
+    {
+      'emoji': '😟',
+      'label': 'Uneasy',
+      'quote':
+          'It\'s okay to pause. Breathe in, breathe out — you\'ve got this.',
+    },
+    {
+      'emoji': '🧘',
+      'label': 'Steady',
+      'quote': 'Tranquility is the quiet spring of purpose. Flow steadily through each moment.',
+    },
+    {
+      'emoji': '🙂',
+      'label': 'Content',
+      'quote': 'Gratitude turns what we already have into enough.',
+    },
+    {
+      'emoji': '🤩',
+      'label': 'Radiant',
+      'quote': 'Your energy today can light up someone else\'s day.',
+    },
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFF0F6FA), // Very light blue top
+              Color(0xFFDCE9F2), // Slightly darker blue bottom
+            ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // The Custom Background with Grid AND Airplane
+            Positioned.fill(
+              child: CustomPaint(painter: DottedBackgroundPainter()),
+            ),
+
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildTopAppBar(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildGreetingShiftCard(),
+                          const SizedBox(height: 16),
+                          _buildMoodCheckInCard(),
+                          const SizedBox(height: 20),
+                          _buildMonthlySnapshotSection(),
+                          const SizedBox(height: 16),
+                          _buildQuickActionBanner(),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  // --- Top App Bar ---
+  Widget _buildTopAppBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFF345B7A),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text(
+                'NG',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'Nandgate',
+                style: TextStyle(
+                  color: primaryTextBlue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                'Mindful Daily Dashboard',
+                style: TextStyle(
+                  color: secondaryTextBlue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.spa_outlined,
+              size: 20,
+              color: Color(0xFF6B9BBF),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF345B7A),
+                child: const Icon(Icons.person, color: Colors.white, size: 22),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Log out',
+            onPressed: () {
+              StoreProvider.of<AppState>(context).dispatch(LogoutAction());
+            },
+            icon: const Icon(Icons.logout, color: primaryTextBlue),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Greeting & Shift Tracker Hero Card ---
+  Widget _buildGreetingShiftCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [heroGradientStart, heroGradientEnd],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: heroGradientEnd.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(
+                      Icons.wb_sunny_outlined,
+                      size: 14,
+                      color: Color(0xFFF59E0B),
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '21°C • Bangalore',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: const [
+                    Text(
+                      'LIVE TIME',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: Colors.white70,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    Text(
+                      '02:33 PM',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Good afternoon, Sarah',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: heroInnerCardBg,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                _buildShiftStatItem(
+                  'Check In',
+                  '09:02 AM',
+                  'On time',
+                  const Color(0xFF10B981),
+                ),
+                Container(width: 1, height: 40, color: Colors.white12),
+                _buildShiftStatItem(
+                  'Worked Today',
+                  '06h 24m',
+                  'Focus Mode',
+                  Colors.white70,
+                ),
+                Container(width: 1, height: 40, color: Colors.white12),
+                _buildShiftStatItem(
+                  'Expected Out',
+                  '06:00 PM',
+                  '0h 36m left',
+                  const Color(0xFFF59E0B),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text(
+                    'Daily Shift Completion',
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                  Text(
+                    '80%',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: 0.8,
+                  minHeight: 6,
+                  backgroundColor: Colors.white12,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShiftStatItem(
+    String label,
+    String value,
+    String subtitle,
+    Color subColor,
+  ) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: Colors.white60),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 9,
+              color: subColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Mood Check-In Card ---
+  Widget _buildMoodCheckInCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardWhite,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(
+                    Icons.sentiment_satisfied_alt_rounded,
+                    color: Color(0xFF2C3E50),
+                    size: 18,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Daily Mood Check-In',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: primaryTextBlue,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: chipBlueBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Mindful Pulse',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: accentBlue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(_moods.length, (index) {
+              final isSelected = _selectedMoodIndex == index;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedMoodIndex = index;
+                    _showQuote = true;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? chipBlueBg : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        _moods[index]['emoji']!,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _moods[index]['label']!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isSelected
+                              ? primaryTextBlue
+                              : secondaryTextBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (_showQuote)
+            Container(
+              margin: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F8FB),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '"${_moods[_selectedMoodIndex]['quote']}"',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF334155),
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '— Marcus Aurelius',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: secondaryTextBlue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // --- Monthly Snapshot 2x2 Grid ---
+  Widget _buildMonthlySnapshotSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'Monthly Snapshot',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: primaryTextBlue,
+                ),
+              ),
+              Text(
+                'November 2024',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryTextBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+        GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 1.45,
+          children: [
+            _buildMetricCard(
+              title: 'Days Present',
+              value: '18 / 22',
+              subtitle: 'This month • On track',
+              icon: Icons.calendar_today_rounded,
+              chipText: '82%',
+              chipColor: accentBlue,
+              chipBg: chipBlueBg,
+            ),
+            _buildMetricCard(
+              title: 'Hours Worked',
+              value: '142h 20m',
+              subtitle: 'Across 18 working days',
+              icon: Icons.access_time_rounded,
+              trailingIcon: Icons.trending_up_rounded,
+              chipColor: const Color(0xFF10B981),
+            ),
+            _buildMetricCard(
+              title: 'Leave Balance',
+              value: '12 days',
+              subtitle: 'Available anytime',
+              icon: Icons.flight_takeoff_rounded,
+              chipText: 'Ready',
+              chipColor: const Color(0xFF10B981),
+              chipBg: const Color(0xFFECFDF5),
+            ),
+            _buildMetricCard(
+              title: 'Next Payday',
+              value: '30 Nov',
+              subtitle: 'November cycle',
+              icon: Icons.account_balance_wallet_rounded,
+              chipText: 'In 6d',
+              chipColor: accentBlue,
+              chipBg: chipBlueBg,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    String? chipText,
+    Color? chipColor,
+    Color? chipBg,
+    IconData? trailingIcon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: primaryTextBlue),
+              ),
+              if (chipText != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: chipBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    chipText,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: chipColor,
+                    ),
+                  ),
+                ),
+              if (trailingIcon != null)
+                Icon(trailingIcon, size: 16, color: chipColor),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryTextBlue,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: primaryTextBlue,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: secondaryTextBlue,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Quick Mindful Action Banner ---
+  Widget _buildQuickActionBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE8F1F8), Color(0xFFD3E6F5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              color: Color(0xFF345B7A),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.self_improvement_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Take a 2-Min Mindful Breath',
+                  style: TextStyle(
+                    color: primaryTextBlue,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Settle focus before your next sprint',
+                  style: TextStyle(color: secondaryTextBlue, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF345B7A),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              minimumSize: const Size(60, 36),
+            ),
+            child: const Text(
+              'Start',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Bottom Tab Navigation Bar ---
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: Colors.black.withValues(alpha: 0.05),
+            width: 1,
+          ),
+        ),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentBottomNavIndex,
+        onTap: (index) => setState(() => _currentBottomNavIndex = index),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFF345B7A),
+        unselectedItemColor: const Color(0xFF94A3B8),
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.self_improvement_rounded),
+            label: 'Reflect',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_rounded),
+            label: 'Metrics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.tune_rounded),
+            label: 'Settings',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Custom Painter for Dotted Grid + Dotted Airplane ---
+class DottedBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Draw the subtle grid of dots
+    final gridPaint = Paint()
+      ..color = const Color(0xFFB0C4D8).withValues(alpha: 0.2)
+      ..style = PaintingStyle.fill;
+
+    const double spacing = 24.0;
+    const double radius = 1.2;
+
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), radius, gridPaint);
+      }
+    }
+
+    // 2. Draw the faint dotted airplane in the bottom right
+    // We use a darker grey-blue color so it's visible against the light background
+    final airplanePaint = Paint()
+      ..color = const Color(0xFF8FA9C1).withValues(alpha: 0.5)
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    // Position the airplane in the bottom right area
+    final startX = size.width * 0.45;
+    final startY = size.height * 0.75;
+
+    // Scale factor based on screen width to keep proportions
+    final s = size.width / 350;
+
+    // Draw the paper airplane shape
+    // Main body pointing right
+    path.moveTo(startX, startY);
+    path.lineTo(startX + 140 * s, startY + 50 * s);
+    path.lineTo(startX + 50 * s, startY + 90 * s);
+    path.lineTo(startX + 10 * s, startY + 60 * s);
+    path.close();
+
+    // Top fold
+    path.moveTo(startX + 140 * s, startY + 50 * s);
+    path.lineTo(startX + 70 * s, startY + 20 * s);
+    path.lineTo(startX + 50 * s, startY + 90 * s);
+
+    // Bottom fold
+    path.moveTo(startX + 10 * s, startY + 60 * s);
+    path.lineTo(startX + 30 * s, startY + 120 * s);
+    path.lineTo(startX + 50 * s, startY + 90 * s);
+
+    // Draw the path using evenly spaced dots
+    _drawDottedPath(canvas, path, airplanePaint, 7.0);
+  }
+
+  // Helper method to draw a path with dots
+  void _drawDottedPath(Canvas canvas, Path path, Paint paint, double spacing) {
+    for (PathMetric metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final tangent = metric.getTangentForOffset(distance);
+        if (tangent != null) {
+          // Draw dots slightly larger than the background grid
+          canvas.drawCircle(tangent.position, 2.2, paint);
+        }
+        distance += spacing;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
