@@ -16,9 +16,13 @@ AppState _rootReducer(AppState state, dynamic action) {
 }
 
 void main() {
-  testWidgets('reveals the mood quote only after an emoji is tapped',
-      (tester) async {
-    final store = Store<AppState>(_rootReducer, initialState: AppState.initial());
+  testWidgets('reveals the mood quote only after an emoji is tapped', (
+    tester,
+  ) async {
+    final store = Store<AppState>(
+      _rootReducer,
+      initialState: AppState.initial(),
+    );
 
     await tester.pumpWidget(
       StoreProvider<AppState>(
@@ -41,5 +45,34 @@ void main() {
 
     expect(find.textContaining('Steady steps today'), findsNothing);
     expect(find.textContaining('light up someone else'), findsOneWidget);
+  });
+
+  testWidgets('floating navigation switches to the selected menu page', (
+    tester,
+  ) async {
+    final store = Store<AppState>(
+      _rootReducer,
+      initialState: AppState.initial(),
+    );
+
+    await tester.pumpWidget(
+      StoreProvider<AppState>(
+        store: store,
+        child: const MaterialApp(home: HomeScreen()),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Calendar'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Calendar'), findsNWidgets(2));
+    expect(
+      find.text('Your shifts and important dates will appear here.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byTooltip('Home'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Mindful Daily Dashboard'), findsOneWidget);
   });
 }

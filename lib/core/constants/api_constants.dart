@@ -12,5 +12,9 @@ class ApiConstants {
   static const String refreshEndpoint = '/auth/refresh';
   static const String fcmTokenEndpoint = '/auth/fcm-token';
 
+  // Attendance
+  static const String myAttendanceEndpoint = '/attendance/me';
+  static const String myAttendanceDayEndpoint = '/attendance/me/day';
+
   static const Duration connectTimeout = Duration(seconds: 15);
 }

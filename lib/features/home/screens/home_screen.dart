@@ -1,10 +1,38 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_redux/flutter_redux.dart';
-
+import 'dart:convert';
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_redux/flutter_redux.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // NEW: For session locking
+
 import '../../../redux/app_state.dart';
+import '../../attendance/screens/attendance_screen.dart';
 import '../../auth/redux/auth_actions.dart';
+
+// --- Quote Model ---
+class Quote {
+  final int id;
+  final String text;
+  final String author;
+  final List<int> moods;
+
+  Quote({
+    required this.id,
+    required this.text,
+    required this.author,
+    required this.moods,
+  });
+
+  factory Quote.fromJson(Map<String, dynamic> json) {
+    return Quote(
+      id: json['id'] ?? 0,
+      text: json['text'] ?? '',
+      author: json['author'] ?? 'Unknown',
+      moods: json['moods'] != null ? List<int>.from(json['moods']) : [],
+    );
+  }
+}
 
 void main() {
   runApp(const MyApp());
@@ -33,8 +61,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentBottomNavIndex = 0;
-  int _selectedMoodIndex = 2; // Default to "Steady"
-  bool _showQuote = true;
+  bool _hasOpenedAttendance = false;
+
+  // --- Mood & Quote State ---
+  int? _selectedMoodIndex; // Changed to int? (null means no mood picked)
+  bool _isSessionLocked = false; // Tracks if the session is locked
+  List<Quote> _allQuotes = [];
+  Quote? _currentQuote;
+  bool _isLoadingQuotes = true;
 
   // --- Exact Colors from Image ---
   static const Color heroGradientStart = Color(0xFF2A3C50);
@@ -46,90 +80,259 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color chipBlueBg = Color(0xFFE8F1F8);
   static const Color cardWhite = Colors.white;
 
-  final List<Map<String, String>> _moods = [
-    {
-      'emoji': '😴',
-      'label': 'Tired',
-      'quote':
-          'Rest is not idleness — it\'s how we recharge for our best work.',
-    },
-    {
-      'emoji': '😟',
-      'label': 'Uneasy',
-      'quote':
-          'It\'s okay to pause. Breathe in, breathe out — you\'ve got this.',
-    },
-    {
-      'emoji': '🧘',
-      'label': 'Steady',
-      'quote': 'Tranquility is the quiet spring of purpose. Flow steadily through each moment.',
-    },
-    {
-      'emoji': '🙂',
-      'label': 'Content',
-      'quote': 'Gratitude turns what we already have into enough.',
-    },
-    {
-      'emoji': '🤩',
-      'label': 'Radiant',
-      'quote': 'Your energy today can light up someone else\'s day.',
-    },
+  // Moods mapped to JSON 'moods' array IDs
+  final List<Map<String, dynamic>> _moods = [
+    {'emoji': '😴', 'label': 'Tired', 'moodId': 1},
+    {'emoji': '😟', 'label': 'Uneasy', 'moodId': 2},
+    {'emoji': '🧘', 'label': 'Steady', 'moodId': 3},
+    {'emoji': '🙂', 'label': 'Content', 'moodId': 4},
+    {'emoji': '🤩', 'label': 'Radiant', 'moodId': 5},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuotesAndSession();
+  }
+
+  // Load JSON, check SharedPreferences, and lock session if it exists
+  Future<void> _loadQuotesAndSession() async {
+    try {
+      final String response = await rootBundle.loadString(
+        'assets/data/quote.json',
+      );
+      final List<dynamic> data = json.decode(response);
+
+      // Load Local Storage Session
+      final prefs = await SharedPreferences.getInstance();
+      final int? savedRating = prefs.getInt('saved_rating');
+      final int? savedQuoteId = prefs.getInt('saved_quote_id');
+
+      setState(() {
+        _allQuotes = data.map((json) => Quote.fromJson(json)).toList();
+
+        // If a session exists, lock it in
+        if (savedRating != null && savedQuoteId != null) {
+          _selectedMoodIndex =
+              savedRating - 1; // Convert 1-based to 0-based index
+          _currentQuote = _allQuotes.firstWhere(
+            (q) => q.id == savedQuoteId,
+            orElse: () => _allQuotes.first,
+          );
+          _isSessionLocked = true;
+        }
+        _isLoadingQuotes = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading quotes: $e');
+      setState(() => _isLoadingQuotes = false);
+    }
+  }
+
+  // Handle emoji click (locks the quote)
+  Future<void> _handleRatingClick(int index) async {
+    if (_isSessionLocked) return; // Prevent clicking if already locked
+
+    final int moodId = _moods[index]['moodId'];
+    final matchingQuotes = _allQuotes
+        .where((q) => q.moods.contains(moodId))
+        .toList();
+
+    if (matchingQuotes.isNotEmpty) {
+      matchingQuotes.shuffle();
+      final newQuote = matchingQuotes.first;
+
+      setState(() {
+        _selectedMoodIndex = index;
+        _currentQuote = newQuote;
+        _isSessionLocked = true;
+      });
+
+      // Save to local storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('saved_rating', index + 1);
+      await prefs.setInt('saved_quote_id', newQuote.id);
+    }
+  }
+
+  // Dev testing reset button
+  Future<void> _handleResetSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('saved_rating');
+    await prefs.remove('saved_quote_id');
+
+    setState(() {
+      _selectedMoodIndex = null;
+      _currentQuote = null;
+      _isSessionLocked = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF0F6FA), // Very light blue top
-              Color(0xFFDCE9F2), // Slightly darker blue bottom
-            ],
+      body: IndexedStack(
+        index: _currentBottomNavIndex,
+        children: [
+          _buildDashboardPage(),
+          _hasOpenedAttendance
+              ? const AttendanceScreen()
+              : const SizedBox.shrink(),
+          _buildSectionPage(
+            title: 'Requests',
+            description: 'Your leave and other requests will appear here.',
+            icon: Icons.assignment_outlined,
           ),
-        ),
-        child: Stack(
-          children: [
-            // The Custom Background with Grid AND Airplane
-            Positioned.fill(
-              child: CustomPaint(painter: DottedBackgroundPainter()),
-            ),
+          _buildSectionPage(
+            title: 'Calendar',
+            description: 'Your shifts and important dates will appear here.',
+            icon: Icons.calendar_month_rounded,
+          ),
+          _buildSectionPage(
+            title: 'Payslip',
+            description: 'Your payslips will appear here.',
+            icon: Icons.account_balance_wallet_outlined,
+          ),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
 
-            SafeArea(
-              child: Column(
-                children: [
-                  _buildTopAppBar(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildGreetingShiftCard(),
-                          const SizedBox(height: 16),
-                          _buildMoodCheckInCard(),
-                          const SizedBox(height: 20),
-                          _buildMonthlySnapshotSection(),
-                          const SizedBox(height: 16),
-                          _buildQuickActionBanner(),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
+  void _selectNavigationItem(int index) {
+    setState(() {
+      _currentBottomNavIndex = index;
+      if (index == 1) _hasOpenedAttendance = true;
+    });
+  }
+
+  Widget _buildDashboardPage() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFF0F6FA), Color(0xFFDCE9F2)],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(painter: DottedBackgroundPainter()),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                _buildTopAppBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildGreetingShiftCard(),
+                        const SizedBox(height: 16),
+                        _buildMoodCheckInCard(),
+                        const SizedBox(height: 20),
+                        _buildMonthlySnapshotSection(),
+                        const SizedBox(height: 16),
+                        _buildQuickActionBanner(),
+                        const SizedBox(height: 24),
+                      ],
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionPage({
+    required String title,
+    required String description,
+    required IconData icon,
+  }) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFF0F6FA), Color(0xFFDCE9F2)],
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildTopAppBar(),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 36,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1E293B)
+                              .withValues(alpha: 0.08),
+                          blurRadius: 28,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F1F8),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Icon(icon, size: 36, color: accentBlue),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: primaryTextBlue,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          description,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: secondaryTextBlue,
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
@@ -158,10 +361,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Column(
+          const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               Text(
                 'Nandgate',
                 style: TextStyle(
@@ -197,10 +400,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           Stack(
             children: [
-              CircleAvatar(
+              const CircleAvatar(
                 radius: 20,
-                backgroundColor: const Color(0xFF345B7A),
-                child: const Icon(Icons.person, color: Colors.white, size: 22),
+                backgroundColor: Color(0xFF345B7A),
+                child: Icon(Icons.person, color: Colors.white, size: 22),
               ),
               Positioned(
                 bottom: 0,
@@ -264,8 +467,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Row(
-                  children: const [
+                child: const Row(
+                  children: [
                     Icon(
                       Icons.wb_sunny_outlined,
                       size: 14,
@@ -292,8 +495,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Column(
-                  children: const [
+                child: const Column(
+                  children: [
                     Text(
                       'LIVE TIME',
                       style: TextStyle(
@@ -325,7 +528,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
@@ -358,12 +560,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
           Column(
             children: [
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
+                children: [
                   Text(
                     'Daily Shift Completion',
                     style: TextStyle(color: Colors.white70, fontSize: 11),
@@ -381,11 +582,11 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
+                child: const LinearProgressIndicator(
                   value: 0.8,
                   minHeight: 6,
                   backgroundColor: Colors.white12,
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               ),
             ],
@@ -431,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Mood Check-In Card ---
+  // --- Mood Check-In Card with Dynamic JSON Quotes & Lock Logic ---
   Widget _buildMoodCheckInCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -449,11 +650,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // --- HEADER ---
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Icon(
                     Icons.sentiment_satisfied_alt_rounded,
                     color: Color(0xFF2C3E50),
@@ -470,105 +672,145 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: chipBlueBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Mindful Pulse',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: accentBlue,
-                    fontWeight: FontWeight.w600,
+              // Show Reset button ONLY if session is locked
+              if (_isSessionLocked)
+                GestureDetector(
+                  onTap: _handleResetSession,
+                  child: const Text(
+                    '(Reset Session)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: accentBlue,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: chipBlueBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Mindful Pulse',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: accentBlue,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(_moods.length, (index) {
-              final isSelected = _selectedMoodIndex == index;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedMoodIndex = index;
-                    _showQuote = true;
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected ? chipBlueBg : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+
+          // --- EMOJI PICKER (Only shows if NO rating is selected) ---
+          if (!_isLoadingQuotes && _selectedMoodIndex == null) ...[
+            const Center(
+              child: Text(
+                'HOW IS YOUR DAY GOING?',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryTextBlue,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(_moods.length, (index) {
+                return GestureDetector(
+                  onTap: () => _handleRatingClick(index),
                   child: Column(
                     children: [
                       Text(
-                        _moods[index]['emoji']!,
-                        style: const TextStyle(fontSize: 24),
+                        _moods[index]['emoji'],
+                        style: const TextStyle(fontSize: 28),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _moods[index]['label']!,
-                        style: TextStyle(
+                        _moods[index]['label'],
+                        style: const TextStyle(
                           fontSize: 11,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isSelected
-                              ? primaryTextBlue
-                              : secondaryTextBlue,
+                          fontWeight: FontWeight.w500,
+                          color: secondaryTextBlue,
                         ),
                       ),
                     ],
                   ),
+                );
+              }),
+            ),
+          ],
+
+          // --- QUOTE DISPLAY (Only shows if a quote is locked in) ---
+          if (_currentQuote != null)
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Container(
+                key: ValueKey(
+                  _currentQuote!.id,
+                ), // Triggers animation on change
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F8FB),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              );
-            }),
-          ),
-          if (_showQuote)
-            Container(
-              margin: const EdgeInsets.only(top: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F8FB),
-                borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      '"${_currentQuote!.text}"',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF334155),
+                        height: 1.4,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '— ${_currentQuote!.author}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: secondaryTextBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    '"${_moods[_selectedMoodIndex]['quote']}"',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFF334155),
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '— Marcus Aurelius',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: secondaryTextBlue,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+            ),
+
+          // --- FALLBACK TEXT (Shows if data is loaded but no mood picked) ---
+          if (!_isLoadingQuotes && _selectedMoodIndex == null) ...[
+            const SizedBox(height: 12),
+            const Center(
+              child: Text(
+                'Select a mood to reveal your personalized quote for the day.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: secondaryTextBlue,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+
+          // --- LOADING STATE ---
+          if (_isLoadingQuotes)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
         ],
@@ -581,11 +823,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
+        const Padding(
+          padding: EdgeInsets.only(left: 4.0, bottom: 12.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               Text(
                 'Monthly Snapshot',
                 style: TextStyle(
@@ -778,10 +1020,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   'Take a 2-Min Mindful Breath',
                   style: TextStyle(
@@ -820,47 +1062,106 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Bottom Tab Navigation Bar ---
+  // --- Floating Bottom Navigation Bar ---
   Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: Colors.black.withValues(alpha: 0.05),
-            width: 1,
-          ),
+    const items = [
+      (label: 'Home', icon: Icons.home_rounded),
+      (label: 'Attendance', icon: Icons.fact_check_outlined),
+      (label: 'Request', icon: Icons.assignment_outlined),
+      (label: 'Calendar', icon: Icons.calendar_month_rounded),
+      (label: 'Payslip', icon: Icons.account_balance_wallet_outlined),
+    ];
+
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: const Color(0xFFE8EEF4)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E293B).withValues(alpha: 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _currentBottomNavIndex,
-        onTap: (index) => setState(() => _currentBottomNavIndex = index),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF345B7A),
-        unselectedItemColor: const Color(0xFF94A3B8),
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.self_improvement_rounded),
-            label: 'Reflect',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: 'Metrics',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.tune_rounded),
-            label: 'Settings',
-          ),
-        ],
+        child: Row(
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            final selected = _currentBottomNavIndex == index;
+
+            return Expanded(
+              child: Semantics(
+                button: true,
+                selected: selected,
+                label: item.label,
+                child: Tooltip(
+                  message: item.label,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () => _selectNavigationItem(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      height: 54,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFF244762)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              AnimatedScale(
+                                scale: selected ? 1 : 0.92,
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutBack,
+                                child: Icon(
+                                  item.icon,
+                                  size: 21,
+                                  color: selected
+                                      ? Colors.white
+                                      : const Color(0xFF8293A3),
+                                ),
+                              ),
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                                child: SizedBox(
+                                  height: selected ? 14 : 0,
+                                  child: selected
+                                      ? Text(
+                                          item.label,
+                                          maxLines: 1,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -870,7 +1171,6 @@ class _HomeScreenState extends State<HomeScreen> {
 class DottedBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw the subtle grid of dots
     final gridPaint = Paint()
       ..color = const Color(0xFFB0C4D8).withValues(alpha: 0.2)
       ..style = PaintingStyle.fill;
@@ -884,50 +1184,38 @@ class DottedBackgroundPainter extends CustomPainter {
       }
     }
 
-    // 2. Draw the faint dotted airplane in the bottom right
-    // We use a darker grey-blue color so it's visible against the light background
     final airplanePaint = Paint()
       ..color = const Color(0xFF8FA9C1).withValues(alpha: 0.5)
       ..style = PaintingStyle.fill;
 
     final path = Path();
-    // Position the airplane in the bottom right area
     final startX = size.width * 0.45;
     final startY = size.height * 0.75;
-
-    // Scale factor based on screen width to keep proportions
     final s = size.width / 350;
 
-    // Draw the paper airplane shape
-    // Main body pointing right
     path.moveTo(startX, startY);
     path.lineTo(startX + 140 * s, startY + 50 * s);
     path.lineTo(startX + 50 * s, startY + 90 * s);
     path.lineTo(startX + 10 * s, startY + 60 * s);
     path.close();
 
-    // Top fold
     path.moveTo(startX + 140 * s, startY + 50 * s);
     path.lineTo(startX + 70 * s, startY + 20 * s);
     path.lineTo(startX + 50 * s, startY + 90 * s);
 
-    // Bottom fold
     path.moveTo(startX + 10 * s, startY + 60 * s);
     path.lineTo(startX + 30 * s, startY + 120 * s);
     path.lineTo(startX + 50 * s, startY + 90 * s);
 
-    // Draw the path using evenly spaced dots
     _drawDottedPath(canvas, path, airplanePaint, 7.0);
   }
 
-  // Helper method to draw a path with dots
   void _drawDottedPath(Canvas canvas, Path path, Paint paint, double spacing) {
     for (PathMetric metric in path.computeMetrics()) {
       double distance = 0.0;
       while (distance < metric.length) {
         final tangent = metric.getTangentForOffset(distance);
         if (tangent != null) {
-          // Draw dots slightly larger than the background grid
           canvas.drawCircle(tangent.position, 2.2, paint);
         }
         distance += spacing;

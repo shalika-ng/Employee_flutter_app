@@ -1,428 +1,508 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_redux/flutter_redux.dart';
 
-import '../../../core/utils/validators.dart';
-import '../../../redux/app_state.dart';
-import '../redux/auth_actions.dart';
-import '../redux/auth_state.dart';
-
-/// ---------- COLOURS (taken from your design) ----------
-class AppColors {
-  static const navy = Color(0xFF1B2A41); // text, icons, button
-  static const buttonDark = Color(0xFF1E293B); // arrow button
-  static const accent = Color(0xFF1F5A7A); // decorative line icons
-  static const hint = Color(0xFF6B7280); // hint text
-  static const bgTop = Color(0xFFE6F0F9);
-  static const bgBottom = Color(0xFF9DC3E0);
-  static const gridLine = Color(0xFF4A6785);
+void main() {
+  runApp(const NandgateApp());
 }
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class NandgateApp extends StatelessWidget {
+  const NandgateApp({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'NANDGATE Login',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        fontFamily: 'sans-serif',
+        scaffoldBackgroundColor: const Color(0xFF9BCBE5),
+      ),
+      home: const NandgateLoginScreen(),
+    );
+  }
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  // Controllers
-  final _subIdController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+class NandgateLoginScreen extends StatefulWidget {
+  const NandgateLoginScreen({super.key});
 
-  // State
-  bool _isPasswordVisible = false;
-  bool _agreedToTerms = true;
+  @override
+  State<NandgateLoginScreen> createState() => _NandgateLoginScreenState();
+}
+
+class _NandgateLoginScreenState extends State<NandgateLoginScreen> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _rememberMe = false;
+  bool _agreeTerms = false;
+  bool _isLoading = false;
+
+  void _handleLogin() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    // Simulate network authentication request
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login action triggered successfully!'),
+          backgroundColor: Color(0xFF1E293B),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
-    _subIdController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _submit(BuildContext context) {
-    final subId = _subIdController.text.trim();
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
-
-    // Basic validation
-    if (subId.isEmpty) {
-      _showSnack(context, 'Please enter Sub ID / Workspace');
-      return;
-    }
-
-    final usernameError = Validators.email(username);
-    final passwordError = Validators.password(password);
-
-    if (usernameError != null || passwordError != null) {
-      _showSnack(context, usernameError ?? passwordError!);
-      return;
-    }
-
-    if (!_agreedToTerms) {
-      _showSnack(context, 'Please agree to the Terms & Conditions');
-      return;
-    }
-
-    // Dispatch to Redux
-    StoreProvider.of<AppState>(context).dispatch(
-      LoginSubmitAction(
-        email: username,
-        password: password,
-      ),
-    );
-  }
-
-  void _showSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.navy,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.white,
-      body: StoreConnector<AppState, AuthState>(
-        converter: (store) => store.state.auth,
-        onWillChange: (previous, current) {
-          if (current.status == AuthStatus.failure &&
-              current.errorMessage != null &&
-              current.errorMessage != previous?.errorMessage) {
-            _showSnack(context, current.errorMessage!);
-          }
-        },
-        builder: (context, authState) {
-          final isLoading = authState.status == AuthStatus.loading;
+      backgroundColor: const Color(0xFF9BCBE5),
+      body: Stack(
+        children: [
+          // Ambient soft mesh gradient background
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFA5D2EA),
+                  Color(0xFF9BCBE5),
+                  Color(0xFF8DBED8),
+                ],
+              ),
+            ),
+          ),
 
-          return LayoutBuilder(
-            builder: (context, c) {
-              final w = c.maxWidth;
-              final h = c.maxHeight;
-              // Adjusted wave slightly lower to make room for the lower form
-              final waveTop = h * 0.73;
+          // Scrollable login content
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: size.height - topPadding - bottomPadding,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
 
-              return Stack(
-                children: [
-                  // 1. Blue gradient background
-                  Positioned.fill(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [AppColors.bgTop, AppColors.bgBottom],
-                        ),
+                      // Full-width NANDGATE Logo Section
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: _buildLogoHeader(),
                       ),
-                    ),
-                  ),
 
-                  // 2. Dashed grid
-                  Positioned.fill(
-                    child: CustomPaint(painter: _GridPainter()),
-                  ),
+                      const SizedBox(height: 24),
 
-                  // 3. Decorative line icons (half cut off at screen edges)
-                  Positioned(
-                    left: -28,
-                    top: h * 0.20,
-                    child: _deco(Icons.event_available_outlined, 110),
-                  ),
-                  Positioned(
-                    right: -40,
-                    top: h * 0.03,
-                    child: _deco(Icons.schedule_outlined, 150),
-                  ),
-                  Positioned(
-                    left: -8,
-                    top: h * 0.54,
-                    child: _deco(Icons.badge_outlined, 110),
-                  ),
-                  Positioned(
-                    right: -6,
-                    top: h * 0.57,
-                    child: _deco(Icons.phone_android_outlined, 100),
-                  ),
-
-                  // 4. White wave at the bottom
-                  Positioned.fill(
-                    child: CustomPaint(painter: _WavePainter(waveTop: waveTop)),
-                  ),
-
-                  // 5. Logo card
-                  Positioned(
-                    top: h * 0.16,
-                    left: w * 0.18,
-                    right: w * 0.12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        height: h * 0.20,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => SizedBox(
-                          height: h * 0.20,
-                          child: const Center(
-                            child: Text(
-                              'NANDGATE',
-                              style: TextStyle(
-                                fontSize: 28,
-                                letterSpacing: 4,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.navy,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // 6. Input fields
-                  Positioned(
-                    top: h * 0.43,
-                    left: w * 0.11,
-                    right: w * 0.11,
-                    child: Column(
-                      children: [
-                        _pillField(
-                          controller: _subIdController,
-                          hint: 'Sub ID / Workspace Name',
-                          icon: Icons.work_outline,
-                          enabled: !isLoading,
-                          textInputAction: TextInputAction.next,
-                        ),
-                        const SizedBox(height: 16),
-                        _pillField(
-                          controller: _usernameController,
-                          hint: 'Username / Email',
-                          icon: Icons.person_outline,
-                          enabled: !isLoading,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                        ),
-                        const SizedBox(height: 16),
-                        _pillField(
-                          controller: _passwordController,
-                          hint: 'Password',
-                          icon: Icons.lock_outline,
-                          obscure: !_isPasswordVisible,
-                          enabled: !isLoading,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: () => _submit(context),
-                          suffix: IconButton(
-                            icon: Icon(
-                              _isPasswordVisible
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              color: Colors.grey.shade500,
-                              size: 22,
-                            ),
-                            onPressed: isLoading
-                                ? null
-                                : () => setState(() => _isPasswordVisible =
-                                    !_isPasswordVisible),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 7. Round arrow button
-                  Positioned(
-                    top: h * 0.68,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: GestureDetector(
-                        onTap: isLoading ? null : () => _submit(context),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: AppColors.buttonDark,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.25),
-                                blurRadius: 12,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: isLoading
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white),
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.arrow_forward,
-                                    color: Colors.white,
-                                    size: 26,
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // 8. Terms & footer
-                  Positioned(
-                    bottom: h * 0.10,
-                    left: 0,
-                    right: 0,
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                      // Form Inputs & Actions
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Column(
                           children: [
-                            GestureDetector(
-                              onTap: isLoading
-                                  ? null
-                                  : () => setState(
-                                      () => _agreedToTerms = !_agreedToTerms),
-                              child: Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: _agreedToTerms
-                                      ? AppColors.navy
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                      color: AppColors.navy, width: 1.5),
+                            // Username Pill Field
+                            _buildPillInputField(
+                              controller: _usernameController,
+                              hintText: 'Username',
+                              prefixIcon: Icons.person_outline_rounded,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Password Pill Field with Toggle
+                            _buildPillInputField(
+                              controller: _passwordController,
+                              hintText: 'Password',
+                              prefixIcon: Icons.lock_outline_rounded,
+                              obscureText: _obscurePassword,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  color: const Color(0xFF64748B),
+                                  size: 20,
                                 ),
-                                child: _agreedToTerms
-                                    ? const Icon(Icons.check,
-                                        size: 15, color: Colors.white)
-                                    : null,
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'I agree with Terms & Conditions!',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.navy,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            const SizedBox(height: 12),
+
+                            // Remember Me & Forgot Password Row
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Remember Me
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _rememberMe = !_rememberMe;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 4, horizontal: 2),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: Checkbox(
+                                            value: _rememberMe,
+                                            onChanged: (val) {
+                                              setState(() {
+                                                _rememberMe = val ?? false;
+                                              });
+                                            },
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            activeColor:
+                                                const Color(0xFF1E293B),
+                                            checkColor: Colors.white,
+                                            side: const BorderSide(
+                                              color: Colors.white70,
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'Remember Me',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                // Forgot Password
+                                TextButton(
+                                  onPressed: () {
+                                    // Handle forgot password flow
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 4),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Forgot Password?',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 22),
-                        const Text(
-                          'POWERED BY NANDGATE-IT',
-                          style: TextStyle(
-                            fontSize: 11,
-                            letterSpacing: 1.6,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.hint,
+                      ),
+
+                      const Spacer(),
+
+                      // Action Button & Paint Slash Divider Baseline
+                      Stack(
+                        alignment: Alignment.topCenter,
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Bottom White Jagged Paint Slash Canvas
+                          Column(
+                            children: [
+                              CustomPaint(
+                                size: Size(size.width, 90),
+                                painter: PaintSlashPainter(),
+                              ),
+                              Container(
+                                width: double.infinity,
+                                color: Colors.white,
+                                padding:
+                                    const EdgeInsets.only(top: 8, bottom: 24),
+                                child: Column(
+                                  children: [
+                                    // Terms & Conditions Checkbox
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _agreeTerms = !_agreeTerms;
+                                        });
+                                      },
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: Checkbox(
+                                              value: _agreeTerms,
+                                              onChanged: (val) {
+                                                setState(() {
+                                                  _agreeTerms = val ?? false;
+                                                });
+                                              },
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              activeColor:
+                                                  const Color(0xFF1E293B),
+                                              side: const BorderSide(
+                                                color: Color(0xFF94A3B8),
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            'I agree with Terms & Conditions!',
+                                            style: TextStyle(
+                                              color: Color(0xFF1E293B),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    // Powered by footer
+                                    const Text(
+                                      'POWERED BY NANDGATE-IT',
+                                      style: TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 10,
+                                        letterSpacing: 1.4,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
+
+                          // Circular Dark Slate Forward Button overlapping the slash
+                          Positioned(
+                            top: -24,
+                            child: GestureDetector(
+                              onTap: _handleLogin,
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF111827),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.28),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.arrow_forward_rounded,
+                                          color: Colors.white,
+                                          size: 26,
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              );
-            },
-          );
-        },
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // ---------- Helpers ----------
+  // Brand Logo Header (renders the geometric monogram & wordmark)
+  Widget _buildLogoHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: Column(
+          children: [
+            // Monogram Mark with Central Logic Gate
+            SizedBox(
+              height: 140,
+              child: CustomPaint(
+                size: const Size(260, 140),
+                painter: NandgateMonogramPainter(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // NANDGATE Typography
+            const Text(
+              'N A N D G A T E',
+              style: TextStyle(
+                fontFamily: 'sans-serif',
+                color: Color(0xFF1E293B),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget _deco(IconData icon, double size) => Icon(
-        icon,
-        size: size,
-        color: AppColors.accent.withValues(alpha: 0.85),
-      );
-
-  Widget _pillField({
+  // Pill Input Field
+  Widget _buildPillInputField({
     required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    bool enabled = true,
-    Widget? suffix,
-    TextInputType? keyboardType,
-    TextInputAction? textInputAction,
-    VoidCallback? onSubmitted,
+    required String hintText,
+    required IconData prefixIcon,
+    bool obscureText = false,
+    Widget? suffixIcon,
   }) {
     return Container(
-      height: 56,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: TextField(
         controller: controller,
-        obscureText: obscure,
-        enabled: enabled,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        onSubmitted: (_) => onSubmitted?.call(),
-        style: const TextStyle(fontSize: 15, color: AppColors.navy),
+        obscureText: obscureText,
+        style: const TextStyle(
+          color: Color(0xFF0F172A),
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(fontSize: 15, color: AppColors.hint),
-          prefixIcon: Icon(icon, color: AppColors.navy, size: 22),
-          suffixIcon: suffix,
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+          prefixIcon: Icon(
+            prefixIcon,
+            color: const Color(0xFF64748B),
+            size: 21,
+          ),
+          suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 17),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
       ),
     );
   }
 }
 
-/// Dashed grid lines over the blue background
-class _GridPainter extends CustomPainter {
+// Custom Painter reproducing the paint slash / snow baseline with particles
+class PaintSlashPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.gridLine.withValues(alpha: 0.55)
-      ..strokeWidth = 0.9;
-    const gap = 50.0;
-    const dash = 8.0;
-    const space = 5.0;
+    final whitePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
 
-    for (double x = 12; x < size.width; x += gap) {
-      for (double y = 0; y < size.height; y += dash + space) {
-        canvas.drawLine(Offset(x, y), Offset(x, y + dash), paint);
-      }
-    }
-    for (double y = 22; y < size.height; y += gap) {
-      for (double x = 0; x < size.width; x += dash + space) {
-        canvas.drawLine(Offset(x, y), Offset(x + dash, y), paint);
-      }
+    // Draw main diagonal white jagged paint slash
+    final path = Path();
+    path.moveTo(0, size.height * 0.72);
+
+    // Dynamic jagged diagonal stroke climbing upwards to the right
+    path.quadraticBezierTo(
+      size.width * 0.25,
+      size.height * 0.65,
+      size.width * 0.5,
+      size.height * 0.52,
+    );
+    path.quadraticBezierTo(
+      size.width * 0.75,
+      size.height * 0.38,
+      size.width,
+      size.height * 0.22,
+    );
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    canvas.drawPath(path, whitePaint);
+
+    // Floating paint splatters / particles above the baseline
+    final particlePaint = Paint()
+      ..color = Colors.white.withOpacity(0.85)
+      ..style = PaintingStyle.fill;
+
+    final particles = [
+      Offset(size.width * 0.08, size.height * 0.62),
+      Offset(size.width * 0.16, size.height * 0.56),
+      Offset(size.width * 0.24, size.height * 0.52),
+      Offset(size.width * 0.32, size.height * 0.46),
+      Offset(size.width * 0.42, size.height * 0.39),
+      Offset(size.width * 0.54, size.height * 0.33),
+      Offset(size.width * 0.64, size.height * 0.28),
+      Offset(size.width * 0.76, size.height * 0.22),
+      Offset(size.width * 0.88, size.height * 0.16),
+      Offset(size.width * 0.94, size.height * 0.12),
+    ];
+
+    for (int i = 0; i < particles.length; i++) {
+      final radius = (i % 2 == 0) ? 2.8 : 3.6;
+      canvas.drawCircle(particles[i], radius, particlePaint);
     }
   }
 
@@ -430,63 +510,102 @@ class _GridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// White wavy bottom with brush strokes
-class _WavePainter extends CustomPainter {
-  final double waveTop;
-  _WavePainter({required this.waveTop});
-
+// Custom Painter reproducing the geometric NG Monogram + Central Logic Gate
+class NandgateMonogramPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
+    final center = Offset(size.width / 2, size.height / 2);
 
-    // Main white body
-    final path = Path()
-      ..moveTo(0, waveTop + 40)
-      ..cubicTo(w * 0.25, waveTop + 5, w * 0.45, waveTop + 55, w * 0.7,
-          waveTop + 25)
-      ..cubicTo(w * 0.85, waveTop + 8, w * 0.95, waveTop - 5, w, waveTop - 12)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(path, Paint()..color = Colors.white);
-
-    // Brush strokes
-    final stroke = Paint()
+    // 1. Draw Geometric 'N' facet (left side)
+    final nPaintWhite = Paint()
       ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final nPaintBlue = Paint()
+      ..color = const Color(0xFF6BAED6)
+      ..style = PaintingStyle.fill;
+
+    final nPath1 = Path()
+      ..moveTo(center.dx - 85, center.dy - 50)
+      ..lineTo(center.dx - 45, center.dy - 50)
+      ..lineTo(center.dx - 70, center.dy + 35)
+      ..lineTo(center.dx - 110, center.dy + 35)
+      ..close();
+    canvas.drawPath(nPath1, nPaintWhite);
+
+    final nPath2 = Path()
+      ..moveTo(center.dx - 110, center.dy + 35)
+      ..lineTo(center.dx - 70, center.dy + 35)
+      ..lineTo(center.dx - 45, center.dy + 10)
+      ..lineTo(center.dx - 85, center.dy - 10)
+      ..close();
+    canvas.drawPath(nPath2, nPaintBlue);
+
+    // 2. Draw Geometric 'G' facet (right side)
+    final gPaintSlate = Paint()
+      ..color = const Color(0xFF334155)
+      ..style = PaintingStyle.fill;
+    final gPaintLight = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final gPathWhite = Path()
+      ..moveTo(center.dx + 45, center.dy - 50)
+      ..lineTo(center.dx + 90, center.dy - 50)
+      ..lineTo(center.dx + 90, center.dy - 20)
+      ..lineTo(center.dx + 55, center.dy - 20)
+      ..close();
+    canvas.drawPath(gPathWhite, gPaintLight);
+
+    final gPathSlate = Path()
+      ..moveTo(center.dx + 30, center.dy - 10)
+      ..lineTo(center.dx + 85, center.dy - 10)
+      ..lineTo(center.dx + 85, center.dy + 35)
+      ..lineTo(center.dx + 20, center.dy + 35)
+      ..lineTo(center.dx + 20, center.dy + 10)
+      ..lineTo(center.dx + 55, center.dy + 10)
+      ..lineTo(center.dx + 55, center.dy + 18)
+      ..lineTo(center.dx + 42, center.dy + 18)
+      ..close();
+    canvas.drawPath(gPathSlate, gPaintSlate);
+
+    // 3. Central NAND Logic Gate Symbol
+    final gatePaint = Paint()
+      ..color = const Color(0xFF1E293B)
       ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round;
 
-    stroke.strokeWidth = 5;
-    canvas.drawPath(
-      Path()
-        ..moveTo(0, waveTop + 38)
-        ..quadraticBezierTo(w * 0.5, waveTop + 8, w, waveTop - 22),
-      stroke,
-    );
-    stroke.strokeWidth = 2.5;
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * 0.05, waveTop + 48)
-        ..quadraticBezierTo(w * 0.55, waveTop + 15, w, waveTop - 12),
-      stroke,
+    final gateFill = Paint()
+      ..color = const Color(0xFF9BCBE5)
+      ..style = PaintingStyle.fill;
+
+    final gateRect = RRect.fromRectAndCorners(
+      Rect.fromCenter(
+          center: Offset(center.dx - 6, center.dy), width: 36, height: 38),
+      topRight: const Radius.circular(18),
+      bottomRight: const Radius.circular(18),
     );
 
-    // Small speckles
-    final dot = Paint()..color = Colors.white.withValues(alpha: 0.9);
-    final dots = [
-      Offset(w * 0.08, waveTop + 8),
-      Offset(w * 0.18, waveTop - 4),
-      Offset(w * 0.40, waveTop + 18),
-      Offset(w * 0.55, waveTop + 6),
-      Offset(w * 0.75, waveTop - 4),
-      Offset(w * 0.88, waveTop - 18),
-    ];
-    for (final d in dots) {
-      canvas.drawCircle(d, 2.2, dot);
-    }
+    // Draw gate body fill and outline
+    canvas.drawRRect(gateRect, gateFill);
+    canvas.drawRRect(gateRect, gatePaint);
+
+    // Inputs (left lines)
+    canvas.drawLine(Offset(center.dx - 32, center.dy - 10),
+        Offset(center.dx - 24, center.dy - 10), gatePaint);
+    canvas.drawLine(Offset(center.dx - 32, center.dy + 10),
+        Offset(center.dx - 24, center.dy + 10), gatePaint);
+
+    // Output bubble (inverter circle)
+    final bubbleCenter = Offset(center.dx + 16, center.dy);
+    canvas.drawCircle(bubbleCenter, 4.5, gateFill);
+    canvas.drawCircle(bubbleCenter, 4.5, gatePaint);
+
+    // Output lead line
+    canvas.drawLine(Offset(center.dx + 21, center.dy),
+        Offset(center.dx + 30, center.dy), gatePaint);
   }
 
   @override
-  bool shouldRepaint(covariant _WavePainter old) => old.waveTop != waveTop;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

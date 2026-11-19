@@ -1,5 +1,7 @@
 import 'package:redux/redux.dart';
 
+import '../features/attendance/redux/attendance_middleware.dart';
+import '../features/attendance/redux/attendance_reducer.dart';
 import '../features/auth/redux/auth_middleware.dart';
 import '../features/auth/redux/auth_reducer.dart';
 import 'app_state.dart';
@@ -7,7 +9,10 @@ import 'app_state.dart';
 /// App-wide root reducer: delegates each slice of [AppState] to its own
 /// feature reducer.
 AppState appReducer(AppState state, dynamic action) {
-  return state.copyWith(auth: authReducer(state.auth, action));
+  return state.copyWith(
+    auth: authReducer(state.auth, action),
+    attendance: attendanceReducer(state.attendance, action),
+  );
 }
 
 /// Creates the single Redux [Store] used by the whole app. Call this once
@@ -18,6 +23,7 @@ Store<AppState> createStore() {
     initialState: AppState.initial(),
     middleware: [
       ...createAuthMiddleware<AppState>(),
+      ...createAttendanceMiddleware<AppState>(),
     ],
   );
 }
