@@ -28,7 +28,7 @@ class App extends StatelessWidget {
           }
           return status == AuthStatus.authenticated
               ? const HomeScreen()
-              : const NandgateLoginScreen();
+              : const LoginScreen();
         },
       ),
     );

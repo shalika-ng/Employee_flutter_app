@@ -2,6 +2,7 @@ import 'package:attendence_employee/features/attendance/models/attendance_models
 import 'package:attendence_employee/features/attendance/redux/attendance_actions.dart';
 import 'package:attendence_employee/features/attendance/redux/attendance_state.dart';
 import 'package:attendence_employee/features/attendance/screens/attendance_screen.dart';
+import 'package:attendence_employee/app/theme/app_theme.dart';
 import 'package:attendence_employee/redux/app_state.dart';
 import 'package:attendence_employee/redux/store.dart';
 import 'package:flutter/material.dart';
@@ -18,37 +19,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final monthData = AttendanceMonthData(
-      employee: _employee,
-      month: 11,
-      year: 2026,
-      days: [_summary],
-      today: const AttendanceToday(
-        date: '2026-11-19',
-        status: 'OUT',
-        lastPunch: null,
-      ),
-      totals: const AttendanceTotals(
-        present: 1,
-        half: 0,
-        absent: 0,
-        leave: 0,
-        holiday: 0,
-        weeklyOff: 0,
-        insufficient: 0,
-        lateCount: 0,
-        workMinutes: 480,
-      ),
-    );
-    final store = Store<AppState>(
-      appReducer,
-      initialState: AppState.initial().copyWith(
-        attendance: AttendanceState(
-          monthStatus: AttendanceLoadStatus.success,
-          monthData: monthData,
-        ),
-      ),
-    );
+    final store = _createStore();
 
     await tester.pumpWidget(
       StoreProvider<AppState>(
@@ -57,12 +28,14 @@ void main() {
       ),
     );
 
+    final heading = tester.widget<Text>(find.text('Attendance'));
+    expect(heading.style?.fontFamily, HomeTheme.fontFamily);
+    expect(heading.style?.fontSize, 16);
+    expect(heading.style?.color, HomeTheme.primaryText);
     expect(find.text('Apply regularization'), findsOneWidget);
     expect(find.text('Apply leave'), findsOneWidget);
     expect(find.text('Apply permission'), findsOneWidget);
 
-    await tester.tap(find.text('Apply leave'));
-    await tester.pump();
     expect(find.text('Punch log'), findsNothing);
 
     await tester.ensureVisible(find.text('PRESENT'));
@@ -77,6 +50,84 @@ void main() {
     expect(find.text('LOP 0.50'), findsNWidgets(2));
     expect(find.text('Close'), findsOneWidget);
   });
+
+  const requestForms = [
+    ('Apply leave', 'New Leave Request', 'Leave dates'),
+    ('Apply permission', 'New Permission Request', 'Permission date'),
+    (
+      'Apply regularization',
+      'Attendance Regularization',
+      'Correct attendance time',
+    ),
+  ];
+  for (final (action, title, section) in requestForms) {
+    testWidgets('$action opens its form', (tester) async {
+      _setTestViewport(tester);
+      await tester.pumpWidget(_attendanceApp(_createStore()));
+
+      await tester.ensureVisible(find.text(action));
+      await tester.tap(find.text(action));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      final appBar = tester.widget<AppBar>(find.byType(AppBar));
+      final titleWidget = tester.widget<Text>(find.text(title));
+      expect(appBar.backgroundColor, HomeTheme.heroGradientStart);
+      expect(titleWidget.style?.fontFamily, HomeTheme.fontFamily);
+      expect(titleWidget.style?.fontSize, 16);
+      expect(titleWidget.style?.fontWeight, FontWeight.w800);
+      expect(find.text(title), findsOneWidget);
+      expect(find.text(section), findsOneWidget);
+    });
+  }
+}
+
+void _setTestViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Store<AppState> _createStore() {
+  final monthData = AttendanceMonthData(
+    employee: _employee,
+    month: 11,
+    year: 2026,
+    days: [_summary],
+    today: const AttendanceToday(
+      date: '2026-11-19',
+      status: 'OUT',
+      lastPunch: null,
+    ),
+    totals: const AttendanceTotals(
+      present: 1,
+      half: 0,
+      absent: 0,
+      leave: 0,
+      holiday: 0,
+      weeklyOff: 0,
+      insufficient: 0,
+      lateCount: 0,
+      workMinutes: 480,
+    ),
+  );
+  return Store<AppState>(
+    appReducer,
+    initialState: AppState.initial().copyWith(
+      attendance: AttendanceState(
+        monthStatus: AttendanceLoadStatus.success,
+        monthData: monthData,
+      ),
+    ),
+  );
+}
+
+Widget _attendanceApp(Store<AppState> store) {
+  return StoreProvider<AppState>(
+    store: store,
+    child: const MaterialApp(home: AttendanceScreen()),
+  );
 }
 
 const _employee = AttendanceEmployee(

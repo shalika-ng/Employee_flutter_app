@@ -23,10 +23,10 @@ class ApiClient {
   final http.Client _client;
 
   Map<String, String> _headers([String? token]) => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
 
   Future<Map<String, dynamic>> post(
     String path, {
@@ -38,7 +38,7 @@ class ApiClient {
           .post(
             Uri.parse('${ApiConstants.baseUrl}$path'),
             headers: _headers(token),
-            body: jsonEncode(body ?? {}),
+            body: body == null ? null : jsonEncode(body),
           )
           .timeout(ApiConstants.connectTimeout);
 

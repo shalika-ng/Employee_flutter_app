@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:redux/redux.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:attendence_employee/features/auth/redux/auth_reducer.dart';
 import 'package:attendence_employee/features/home/screens/home_screen.dart';
@@ -16,9 +17,10 @@ AppState _rootReducer(AppState state, dynamic action) {
 }
 
 void main() {
-  testWidgets('reveals the mood quote only after an emoji is tapped', (
+  testWidgets('reveals and saves a mood quote after an emoji is tapped', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues({});
     final store = Store<AppState>(
       _rootReducer,
       initialState: AppState.initial(),
@@ -31,25 +33,24 @@ void main() {
       ),
     );
 
-    // No quote shown yet.
-    expect(find.textContaining('Steady steps today'), findsNothing);
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pump();
+    expect(find.textContaining('— '), findsNothing);
+    expect(find.text('🧘'), findsOneWidget);
 
     await tester.tap(find.text('🧘'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.textContaining('Steady steps today'), findsOneWidget);
-
-    // Tapping a different mood swaps the quote.
-    await tester.tap(find.text('✨'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Steady steps today'), findsNothing);
-    expect(find.textContaining('light up someone else'), findsOneWidget);
+    expect(find.textContaining('— '), findsOneWidget);
+    expect(find.text('Reset'), findsOneWidget);
   });
 
   testWidgets('floating navigation switches to the selected menu page', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues({});
     final store = Store<AppState>(
       _rootReducer,
       initialState: AppState.initial(),

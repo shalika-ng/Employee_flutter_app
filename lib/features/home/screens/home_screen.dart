@@ -1,14 +1,17 @@
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // NEW: For session locking
 
+import '../../../app/theme/app_theme.dart';
+import '../../../core/network/api_client.dart';
 import '../../../redux/app_state.dart';
 import '../../attendance/screens/attendance_screen.dart';
 import '../../auth/redux/auth_actions.dart';
+import '../models/dashboard_model.dart';
+import '../services/dashboard_service.dart';
 
 // --- Quote Model ---
 class Quote {
@@ -46,7 +49,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Mindful Daily Dashboard',
-      theme: ThemeData(fontFamily: 'Roboto', useMaterial3: true),
+      theme: ThemeData(fontFamily: HomeTheme.fontFamily, useMaterial3: true),
       home: const HomeScreen(),
     );
   }
@@ -69,15 +72,22 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Quote> _allQuotes = [];
   Quote? _currentQuote;
   bool _isLoadingQuotes = true;
+  String? _dashboardToken;
+  Future<DashboardData>? _dashboardFuture;
 
   // --- Exact Colors from Image ---
-  static const Color heroGradientStart = Color(0xFF2A3C50);
-  static const Color heroGradientEnd = Color(0xFF1B2838);
-  static const Color heroInnerCardBg = Color(0xFF33465A);
-  static const Color primaryTextBlue = Color(0xFF1E293B);
-  static const Color secondaryTextBlue = Color(0xFF64748B);
-  static const Color accentBlue = Color(0xFF4A90E2);
-  static const Color chipBlueBg = Color(0xFFE8F1F8);
+  static const Color backgroundGradientTop = HomeTheme.backgroundTop;
+  static const Color backgroundGradientBottom = HomeTheme.backgroundBottom;
+  static const Color heroGradientStart = HomeTheme.heroGradientStart;
+  static const Color heroGradientEnd = HomeTheme.heroGradientEnd;
+  static const Color heroInnerCardBg = HomeTheme.heroInnerCardBackground;
+  static const Color primaryTextBlue = HomeTheme.primaryText;
+  static const Color secondaryTextBlue = HomeTheme.secondaryText;
+  static const Color accentBlue = HomeTheme.accentBlue;
+  static const Color chipBlueBg = HomeTheme.chipBlueBackground;
+  static const Color borderBlue = HomeTheme.borderBlue;
+  static const Color icyMutedBlue = HomeTheme.icyMutedBlue;
+  static const Color lightMutedBlue = HomeTheme.lightMutedBlue;
   static const Color cardWhite = Colors.white;
 
   // Moods mapped to JSON 'moods' array IDs
@@ -93,6 +103,25 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadQuotesAndSession();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final token = StoreProvider.of<AppState>(context).state.auth.token;
+    if (token != null && token.isNotEmpty && token != _dashboardToken) {
+      _dashboardToken = token;
+      _dashboardFuture = DashboardService().getMyDashboard(token: token);
+    }
+  }
+
+  void _retryDashboard() {
+    final token = StoreProvider.of<AppState>(context).state.auth.token;
+    if (token == null || token.isEmpty) return;
+    setState(() {
+      _dashboardToken = token;
+      _dashboardFuture = DashboardService().getMyDashboard(token: token);
+    });
   }
 
   // Load JSON, check SharedPreferences, and lock session if it exists
@@ -212,43 +241,81 @@ class _HomeScreenState extends State<HomeScreen> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFF0F6FA), Color(0xFFDCE9F2)],
+          colors: [backgroundGradientTop, backgroundGradientBottom],
         ),
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: CustomPaint(painter: DottedBackgroundPainter()),
-          ),
-          SafeArea(
-            child: Column(
+      child: SafeArea(
+        bottom: false,
+        child: FutureBuilder<DashboardData>(
+          future: _dashboardFuture,
+          builder: (context, snapshot) {
+            final data = snapshot.data;
+            final error = snapshot.error;
+            return Column(
               children: [
-                _buildTopAppBar(),
+                _buildTopAppBar(data),
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildGreetingShiftCard(),
-                        const SizedBox(height: 16),
+                        if (snapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            _dashboardFuture != null)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 10),
+                            child: LinearProgressIndicator(
+                              color: heroGradientStart,
+                              backgroundColor: Colors.white70,
+                            ),
+                          ),
+                        if (error != null) _buildDashboardError(error),
+                        _buildGreetingShiftCard(data),
+                        const SizedBox(height: 14),
                         _buildMoodCheckInCard(),
-                        const SizedBox(height: 20),
-                        _buildMonthlySnapshotSection(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
+                        _buildMonthlySnapshotSection(data),
+                        if (data != null) ...[
+                          const SizedBox(height: 18),
+                          _buildUpcomingEvents(data),
+                        ],
+                        const SizedBox(height: 14),
                         _buildQuickActionBanner(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 84),
                       ],
                     ),
                   ),
                 ),
               ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardError(Object error) {
+    final message = error is ApiException
+        ? error.message
+        : 'Unable to load dashboard. Please try again.';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F0),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Color(0xFF9F2D25), fontSize: 12),
             ),
           ),
+          TextButton(onPressed: _retryDashboard, child: const Text('Retry')),
         ],
       ),
     );
@@ -264,13 +331,13 @@ class _HomeScreenState extends State<HomeScreen> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFF0F6FA), Color(0xFFDCE9F2)],
+          colors: [backgroundGradientTop, backgroundGradientBottom],
         ),
       ),
       child: SafeArea(
         child: Column(
           children: [
-            _buildTopAppBar(),
+            _buildTopAppBar(null),
             Expanded(
               child: Center(
                 child: Padding(
@@ -337,96 +404,136 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- Top App Bar ---
-  Widget _buildTopAppBar() {
+  Widget _buildTopAppBar(DashboardData? data) {
+    final user = StoreProvider.of<AppState>(context).state.auth.user;
+    final name = data?.employee.name ?? user?.name ?? 'Employee';
+    final employeeDetails = [
+      data?.employee.empCode ?? user?.empCode,
+      data?.employee.designation ?? user?.designation,
+    ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
+    final initials = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0].toUpperCase())
+        .join();
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 10),
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF345B7A),
-              borderRadius: BorderRadius.circular(12),
+              color: primaryTextBlue,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryTextBlue.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: const Center(
               child: Text(
                 'NG',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Nandgate',
-                style: TextStyle(
-                  color: primaryTextBlue,
-                  fontSize: 16,
+                  fontSize: 16.5,
                   fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
                 ),
               ),
-              Text(
-                'Mindful Daily Dashboard',
-                style: TextStyle(
-                  color: secondaryTextBlue,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            width: 38,
-            height: 38,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.spa_outlined,
-              size: 20,
-              color: Color(0xFF6B9BBF),
             ),
           ),
           const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Text('Nandgate', style: HomeTheme.headerTitle),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  employeeDetails.isEmpty
+                      ? 'Mindful Daily Dashboard'
+                      : employeeDetails,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: HomeTheme.headerSubtitle,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.65),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.8),
+                width: 1,
+              ),
+            ),
+            child: const Icon(Icons.spa_outlined, size: 19, color: accentBlue),
+          ),
+          const SizedBox(width: 10),
           Stack(
+            clipBehavior: Clip.none,
             children: [
-              const CircleAvatar(
-                radius: 20,
-                backgroundColor: Color(0xFF345B7A),
-                child: Icon(Icons.person, color: Colors.white, size: 22),
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: accentBlue,
+                child: Text(
+                  initials.isEmpty ? 'E' : initials,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: Container(
-                  width: 12,
-                  height: 12,
+                  width: 9,
+                  height: 9,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981),
+                    color: const Color(0xFF94A3B8),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 4),
           IconButton(
+            visualDensity: VisualDensity.compact,
             tooltip: 'Log out',
             onPressed: () {
               StoreProvider.of<AppState>(context).dispatch(LogoutAction());
             },
-            icon: const Icon(Icons.logout, color: primaryTextBlue),
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 21,
+              color: secondaryTextBlue,
+            ),
           ),
         ],
       ),
@@ -434,7 +541,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- Greeting & Shift Tracker Hero Card ---
-  Widget _buildGreetingShiftCard() {
+  Widget _buildGreetingShiftCard(DashboardData? data) {
+    final userName =
+        data?.employee.name ??
+        StoreProvider.of<AppState>(context).state.auth.user?.name ??
+        'there';
+    final designation = data?.employee.designation ?? '';
+    final todayWorkMinutes = _todayWorkMinutes(data);
+    final todayDate = DateTime.tryParse(data?.today.date ?? '');
+    final dateLabel = todayDate == null
+        ? 'Today'
+        : MaterialLocalizations.of(context).formatMediumDate(todayDate);
+    final status = data?.today.status ?? '—';
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -458,142 +576,143 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.wb_sunny_outlined,
-                      size: 14,
-                      color: Color(0xFFF59E0B),
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      '21°C • Bangalore',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Column(
-                  children: [
-                    Text(
-                      'LIVE TIME',
-                      style: TextStyle(
-                        fontSize: 8,
-                        color: Colors.white70,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    Text(
-                      '02:33 PM',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+              _heroPill(icon: Icons.calendar_today_rounded, label: dateLabel),
+              _heroPill(
+                icon: Icons.circle,
+                label: 'STATUS: $status',
+                iconColor: status.toUpperCase() == 'IN'
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFF94A3B8),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Good afternoon, Sarah',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+          Row(
+            children: [
+              Text(
+                'Good ${_timeGreeting()}, $userName',
+                style: HomeTheme.pageTitle.copyWith(
+                  color: Colors.white,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text('👋', style: TextStyle(fontSize: 19)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            data?.today.punchInTime == null
+                ? 'Not punched in yet. Take a moment to prepare your day.'
+                : 'Your attendance is recorded for today.',
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: icyMutedBlue,
+              height: 1.35,
             ),
           ),
+          if (designation.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              designation,
+              style: const TextStyle(color: lightMutedBlue, fontSize: 11),
+            ),
+          ],
           const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              color: heroInnerCardBg,
+              color: heroInnerCardBg.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
             child: Row(
               children: [
                 _buildShiftStatItem(
-                  'Check In',
-                  '09:02 AM',
-                  'On time',
-                  const Color(0xFF10B981),
+                  'CHECK IN',
+                  _formatTime(context, data?.today.punchInTime),
+                  data?.today.punchInTime == null ? 'Not Started' : 'Today',
+                  Colors.white60,
                 ),
-                Container(width: 1, height: 40, color: Colors.white12),
+                Container(width: 1, height: 44, color: Colors.white10),
                 _buildShiftStatItem(
-                  'Worked Today',
-                  '06h 24m',
-                  'Focus Mode',
-                  Colors.white70,
+                  'WORKED',
+                  _formatDuration(todayWorkMinutes),
+                  todayWorkMinutes == null ? 'No data' : 'Today so far',
+                  lightMutedBlue,
                 ),
-                Container(width: 1, height: 40, color: Colors.white12),
+                Container(width: 1, height: 44, color: Colors.white10),
                 _buildShiftStatItem(
-                  'Expected Out',
-                  '06:00 PM',
-                  '0h 36m left',
-                  const Color(0xFFF59E0B),
+                  'LAST PUNCH',
+                  data?.today.lastPunch == null
+                      ? 'None'
+                      : _formatTime(context, data!.today.lastPunch),
+                  data?.today.lastPunch == null
+                      ? 'No punches today'
+                      : 'Latest activity',
+                  Colors.white60,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Column(
-            children: [
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Daily Shift Completion',
-                    style: TextStyle(color: Colors.white70, fontSize: 11),
-                  ),
-                  Text(
-                    '80%',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: const LinearProgressIndicator(
-                  value: 0.8,
-                  minHeight: 6,
-                  backgroundColor: Colors.white12,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _heroPill({
+    required IconData icon,
+    required String label,
+    Color iconColor = Colors.white,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: iconColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  String _timeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  }
+
+  int? _todayWorkMinutes(DashboardData? data) {
+    if (data == null) return null;
+    for (final day in data.days) {
+      if (day.date == data.today.date) return day.attendance?.workMinutes ?? 0;
+    }
+    return null;
+  }
+
+  String _formatDuration(int? minutes) {
+    if (minutes == null) return '—';
+    return '${minutes ~/ 60}h ${(minutes % 60).toString().padLeft(2, '0')}m';
+  }
+
+  String _formatTime(BuildContext context, DateTime? value) {
+    if (value == null) return '—';
+    return TimeOfDay.fromDateTime(value).format(context);
   }
 
   Widget _buildShiftStatItem(
@@ -607,14 +726,21 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: Colors.white60),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9.5,
+              letterSpacing: 0.5,
+              color: lightMutedBlue,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w800,
               color: Colors.white,
             ),
           ),
@@ -639,11 +765,12 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: cardWhite,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderBlue),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: primaryTextBlue.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -658,18 +785,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Icon(
                     Icons.sentiment_satisfied_alt_rounded,
-                    color: Color(0xFF2C3E50),
-                    size: 18,
+                    color: primaryTextBlue,
+                    size: 19,
                   ),
                   SizedBox(width: 8),
-                  Text(
-                    'Daily Mood Check-In',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: primaryTextBlue,
-                    ),
-                  ),
+                  Text('Daily Mood Check-In', style: HomeTheme.cardTitle),
                 ],
               ),
               // Show Reset button ONLY if session is locked
@@ -677,7 +797,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 GestureDetector(
                   onTap: _handleResetSession,
                   child: const Text(
-                    '(Reset Session)',
+                    'Reset',
                     style: TextStyle(
                       fontSize: 11,
                       color: accentBlue,
@@ -693,14 +813,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: chipBlueBg,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    'Mindful Pulse',
+                    'MINDFUL PULSE',
                     style: TextStyle(
-                      fontSize: 10,
-                      color: accentBlue,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 9.5,
+                      color: primaryTextBlue,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
@@ -714,10 +835,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 'HOW IS YOUR DAY GOING?',
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: secondaryTextBlue,
-                  letterSpacing: 1,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: lightMutedBlue,
+                  letterSpacing: 0.7,
                 ),
               ),
             ),
@@ -725,24 +846,58 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(_moods.length, (index) {
+                final selected = _selectedMoodIndex == index;
                 return GestureDetector(
                   onTap: () => _handleRatingClick(index),
-                  child: Column(
-                    children: [
-                      Text(
-                        _moods[index]['emoji'],
-                        style: const TextStyle(fontSize: 28),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 56,
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [heroGradientStart, heroGradientEnd],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _moods[index]['label'],
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: secondaryTextBlue,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: selected
+                            ? const Color(0xFF97C1DE)
+                            : Colors.white.withValues(alpha: 0.18),
+                        width: selected ? 2 : 1,
+                      ),
+                      boxShadow: [
+                        if (selected)
+                          BoxShadow(
+                            color: primaryTextBlue.withValues(alpha: 0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          _moods[index]['emoji'],
+                          style: const TextStyle(fontSize: 22),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          _moods[index]['label'],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFFDCE8F3),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }),
@@ -759,7 +914,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ), // Triggers animation on change
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF4F8FB),
+                  color: const Color(0xFFEAF3FB),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -770,7 +925,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
-                        color: Color(0xFF334155),
+                        color: primaryTextBlue,
                         height: 1.4,
                         fontWeight: FontWeight.w500,
                       ),
@@ -795,11 +950,11 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 12),
             const Center(
               child: Text(
-                'Select a mood to reveal your personalized quote for the day.',
+                'Take a moment to check in with yourself.',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: secondaryTextBlue,
-                  fontStyle: FontStyle.italic,
+                  fontSize: 11.5,
+                  color: primaryTextBlue,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -819,26 +974,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- Monthly Snapshot 2x2 Grid ---
-  Widget _buildMonthlySnapshotSection() {
+  Widget _buildMonthlySnapshotSection(DashboardData? data) {
+    final monthLabel = data == null || data.month < 1 || data.year < 1
+        ? 'This month'
+        : MaterialLocalizations.of(context)
+              .formatMonthYear(DateTime(data.year, data.month));
+    final presentDays = data?.presentDays ?? 0;
+    final totalDays = data?.days.length ?? 0;
+    final workHours = data == null
+        ? '—'
+        : '${data.workMinutes ~/ 60}h ${data.workMinutes % 60}m';
+    final nextHoliday = _nextHoliday(data);
+    final holidayDate = nextHoliday == null
+        ? '—'
+        : DateTime.tryParse(nextHoliday.startDate);
+    final holidayDateLabel = holidayDate is DateTime
+        ? MaterialLocalizations.of(context).formatShortDate(holidayDate)
+        : 'No date';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4.0, bottom: 12.0),
+        Padding(
+          padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Text('Monthly Snapshot', style: HomeTheme.sectionTitle),
               Text(
-                'Monthly Snapshot',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: primaryTextBlue,
-                ),
-              ),
-              Text(
-                'November 2024',
-                style: TextStyle(
+                monthLabel,
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: secondaryTextBlue,
@@ -853,42 +1017,42 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSpacing: 12,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.45,
+          childAspectRatio: 1.36,
           children: [
-            _buildMetricCard(
-              title: 'Days Present',
-              value: '18 / 22',
-              subtitle: 'This month • On track',
-              icon: Icons.calendar_today_rounded,
-              chipText: '82%',
-              chipColor: accentBlue,
-              chipBg: chipBlueBg,
+            _buildSnapshotCard(
+              label: 'ATTENDANCE',
+              value: data == null ? '—' : '$presentDays / $totalDays Days',
+              badgeText: data == null ? 'Loading' : '$presentDays Present',
+              footer: data == null
+                  ? 'Monthly attendance'
+                  : '$presentDays present · $workHours worked',
+              footerIcon: data == null ? null : Icons.circle,
             ),
-            _buildMetricCard(
-              title: 'Hours Worked',
-              value: '142h 20m',
-              subtitle: 'Across 18 working days',
-              icon: Icons.access_time_rounded,
-              trailingIcon: Icons.trending_up_rounded,
-              chipColor: const Color(0xFF10B981),
+            _buildSnapshotCard(
+              label: 'LOSS OF PAY',
+              value: data == null ? '—' : '${data.lopDays} Days',
+              badgeText: data == null ? 'Loading' : 'Recorded',
+              footer: '$monthLabel LOP',
             ),
-            _buildMetricCard(
-              title: 'Leave Balance',
-              value: '12 days',
-              subtitle: 'Available anytime',
-              icon: Icons.flight_takeoff_rounded,
-              chipText: 'Ready',
-              chipColor: const Color(0xFF10B981),
-              chipBg: const Color(0xFFECFDF5),
+            _buildSnapshotCard(
+              label: 'LEAVE BALANCE',
+              value: data == null
+                  ? '—'
+                  : '${data.leaveBalance.available} / ${data.leaveBalance.total} Days',
+              badgeText: data == null
+                  ? 'Loading'
+                  : '${data.leaveBalance.available} Available',
+              footer: data == null
+                  ? 'Available leave'
+                  : '${data.leaveBalance.pendingDays} pending approval',
             ),
-            _buildMetricCard(
-              title: 'Next Payday',
-              value: '30 Nov',
-              subtitle: 'November cycle',
-              icon: Icons.account_balance_wallet_rounded,
-              chipText: 'In 6d',
-              chipColor: accentBlue,
-              chipBg: chipBlueBg,
+            _buildSnapshotCard(
+              label: 'NEXT HOLIDAY',
+              value: nextHoliday?.name ?? 'None scheduled',
+              badgeText: data == null ? 'Loading' : holidayDateLabel,
+              footer: nextHoliday == null
+                  ? 'No upcoming holiday'
+                  : 'Upcoming holiday',
             ),
           ],
         ),
@@ -896,24 +1060,37 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMetricCard({
-    required String title,
+  DashboardEvent? _nextHoliday(DashboardData? data) {
+    if (data == null) return null;
+    final today = DateTime.tryParse(data.today.date);
+    final holidays = data.events.where((event) {
+      if (!event.type.contains('HOLIDAY')) return false;
+      final date = DateTime.tryParse(event.startDate);
+      return date != null && (today == null || !date.isBefore(today));
+    }).toList()..sort((a, b) => a.startDate.compareTo(b.startDate));
+    return holidays.isEmpty ? null : holidays.first;
+  }
+
+  Widget _buildSnapshotCard({
+    required String label,
     required String value,
-    required String subtitle,
-    required IconData icon,
-    String? chipText,
-    Color? chipColor,
-    Color? chipBg,
-    IconData? trailingIcon,
+    required String badgeText,
+    required String footer,
+    IconData? footerIcon,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: cardWhite,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [heroGradientStart, heroGradientEnd],
+        ),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: primaryTextBlue.withValues(alpha: 0.16),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -926,64 +1103,65 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: icyMutedBlue,
+                  ),
                 ),
-                child: Icon(icon, size: 16, color: primaryTextBlue),
               ),
-              if (chipText != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: chipBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    chipText,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: chipColor,
-                    ),
+              const SizedBox(width: 4),
+              Container(
+                constraints: const BoxConstraints(maxWidth: 88),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
                   ),
                 ),
-              if (trailingIcon != null)
-                Icon(trailingIcon, size: 16, color: chipColor),
+                child: Text(
+                  badgeText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFDCE8F3),
+                  ),
+                ),
+              ),
             ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: HomeTheme.metric.copyWith(color: Colors.white),
+          ),
+          Row(
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: secondaryTextBlue,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: primaryTextBlue,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: secondaryTextBlue,
+              if (footerIcon != null) ...[
+                const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
+                const SizedBox(width: 5),
+              ],
+              Expanded(
+                child: Text(
+                  footer,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    color: icyMutedBlue,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -993,24 +1171,145 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildUpcomingEvents(DashboardData data) {
+    final today = DateTime.tryParse(data.today.date);
+    final events = data.events.where((event) {
+      final date = DateTime.tryParse(event.startDate);
+      return date != null && (today == null || !date.isBefore(today));
+    }).toList()..sort((a, b) => a.startDate.compareTo(b.startDate));
+    if (events.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 10),
+            child: Row(
+              children: [
+                const Text('Announcements', style: HomeTheme.sectionTitle),
+                const SizedBox(width: 6),
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF10B981),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${events.length} Events',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: secondaryTextBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...events.take(3).map((event) {
+            final date = DateTime.tryParse(event.startDate);
+            final dateLabel = date == null
+                ? event.startDate
+                : MaterialLocalizations.of(context).formatShortDate(date);
+            final icon = event.type.contains('HOLIDAY')
+                ? Icons.calendar_month_outlined
+                : Icons.event_note_outlined;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: cardWhite,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: borderBlue),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryTextBlue.withValues(alpha: 0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: chipBlueBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 18, color: accentBlue),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: primaryTextBlue,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          event.type.replaceAll('_', ' '),
+                          style: const TextStyle(
+                            color: secondaryTextBlue,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    dateLabel,
+                    style: const TextStyle(
+                      color: secondaryTextBlue,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   // --- Quick Mindful Action Banner ---
   Widget _buildQuickActionBanner() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE8F1F8), Color(0xFFD3E6F5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: cardWhite,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderBlue),
+        boxShadow: [
+          BoxShadow(
+            color: primaryTextBlue.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 40,
+            height: 40,
             decoration: const BoxDecoration(
-              color: Color(0xFF345B7A),
+              color: primaryTextBlue,
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -1043,7 +1342,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ElevatedButton(
             onPressed: () {},
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF345B7A),
+              backgroundColor: primaryTextBlue,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1074,90 +1373,68 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
-        padding: const EdgeInsets.all(7),
+        height: 58,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFE8EEF4)),
+          color: cardWhite,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: borderBlue),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1E293B).withValues(alpha: 0.14),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
+              color: primaryTextBlue.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: List.generate(items.length, (index) {
             final item = items[index];
             final selected = _currentBottomNavIndex == index;
-
-            return Expanded(
-              child: Semantics(
-                button: true,
-                selected: selected,
-                label: item.label,
-                child: Tooltip(
-                  message: item.label,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: () => _selectNavigationItem(index),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      height: 54,
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFF244762)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+            return Semantics(
+              button: true,
+              selected: selected,
+              label: item.label,
+              child: Tooltip(
+                message: item.label,
+                child: selected
+                    ? InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => _selectNavigationItem(index),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primaryTextBlue,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              AnimatedScale(
-                                scale: selected ? 1 : 0.92,
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutBack,
-                                child: Icon(
-                                  item.icon,
-                                  size: 21,
-                                  color: selected
-                                      ? Colors.white
-                                      : const Color(0xFF8293A3),
-                                ),
-                              ),
-                              AnimatedSize(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                                child: SizedBox(
-                                  height: selected ? 14 : 0,
-                                  child: selected
-                                      ? Text(
-                                          item.label,
-                                          maxLines: 1,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        )
-                                      : const SizedBox.shrink(),
+                              Icon(item.icon, color: Colors.white, size: 17),
+                              const SizedBox(width: 6),
+                              Text(
+                                item.label,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
                           ),
-                        ],
+                        ),
+                      )
+                    : IconButton(
+                        onPressed: () => _selectNavigationItem(index),
+                        icon: Icon(item.icon, color: lightMutedBlue, size: 20),
+                        splashRadius: 20,
                       ),
-                    ),
-                  ),
-                ),
               ),
             );
           }),
@@ -1165,64 +1442,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
-
-// --- Custom Painter for Dotted Grid + Dotted Airplane ---
-class DottedBackgroundPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = const Color(0xFFB0C4D8).withValues(alpha: 0.2)
-      ..style = PaintingStyle.fill;
-
-    const double spacing = 24.0;
-    const double radius = 1.2;
-
-    for (double x = 0; x < size.width; x += spacing) {
-      for (double y = 0; y < size.height; y += spacing) {
-        canvas.drawCircle(Offset(x, y), radius, gridPaint);
-      }
-    }
-
-    final airplanePaint = Paint()
-      ..color = const Color(0xFF8FA9C1).withValues(alpha: 0.5)
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    final startX = size.width * 0.45;
-    final startY = size.height * 0.75;
-    final s = size.width / 350;
-
-    path.moveTo(startX, startY);
-    path.lineTo(startX + 140 * s, startY + 50 * s);
-    path.lineTo(startX + 50 * s, startY + 90 * s);
-    path.lineTo(startX + 10 * s, startY + 60 * s);
-    path.close();
-
-    path.moveTo(startX + 140 * s, startY + 50 * s);
-    path.lineTo(startX + 70 * s, startY + 20 * s);
-    path.lineTo(startX + 50 * s, startY + 90 * s);
-
-    path.moveTo(startX + 10 * s, startY + 60 * s);
-    path.lineTo(startX + 30 * s, startY + 120 * s);
-    path.lineTo(startX + 50 * s, startY + 90 * s);
-
-    _drawDottedPath(canvas, path, airplanePaint, 7.0);
-  }
-
-  void _drawDottedPath(Canvas canvas, Path path, Paint paint, double spacing) {
-    for (PathMetric metric in path.computeMetrics()) {
-      double distance = 0.0;
-      while (distance < metric.length) {
-        final tangent = metric.getTangentForOffset(distance);
-        if (tangent != null) {
-          canvas.drawCircle(tangent.position, 2.2, paint);
-        }
-        distance += spacing;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -15,6 +15,14 @@ class ApiConstants {
   // Attendance
   static const String myAttendanceEndpoint = '/attendance/me';
   static const String myAttendanceDayEndpoint = '/attendance/me/day';
+  static const String myDashboardEndpoint = '/employees/me/dashboard';
+
+  // Employee requests
+  static const String myLeaveRequestEndpoint = '/leave/me/apply';
+  static const String myLeaveRequestCancelPrefix = '/leave/me/';
+  static const String myPermissionRequestEndpoint = '/permission/me/apply';
+  static const String myPermissionRequestCancelPrefix = '/permission/me/';
+  static const String myPermissionBalanceEndpoint = '/permission/me/balance';
 
   static const Duration connectTimeout = Duration(seconds: 15);
 }
