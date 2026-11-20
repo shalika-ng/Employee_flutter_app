@@ -66,7 +66,7 @@ void main() {
     await tester.tap(find.byTooltip('Calendar'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Calendar'), findsNWidgets(2));
+    expect(find.text('Calendar'), findsOneWidget);
     expect(
       find.text('Your shifts and important dates will appear here.'),
       findsOneWidget,

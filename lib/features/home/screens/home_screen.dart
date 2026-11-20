@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart'; // NEW: For session
 
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/modern_curved_bottom_nav.dart';
 import '../../../redux/app_state.dart';
 import '../../attendance/screens/attendance_screen.dart';
 import '../../auth/redux/auth_actions.dart';
@@ -205,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildDashboardPage(),
           _hasOpenedAttendance
-              ? const AttendanceScreen()
+              ? AttendanceScreen(onNavigate: _navigateFromNestedPage)
               : const SizedBox.shrink(),
           _buildSectionPage(
             title: 'Requests',
@@ -233,6 +234,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _currentBottomNavIndex = index;
       if (index == 1) _hasOpenedAttendance = true;
     });
+  }
+
+  void _navigateFromNestedPage(int index) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    _selectNavigationItem(index);
   }
 
   Widget _buildDashboardPage() {
@@ -1363,83 +1369,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- Floating Bottom Navigation Bar ---
   Widget _buildBottomNav() {
-    const items = [
-      (label: 'Home', icon: Icons.home_rounded),
-      (label: 'Attendance', icon: Icons.fact_check_outlined),
-      (label: 'Request', icon: Icons.assignment_outlined),
-      (label: 'Calendar', icon: Icons.calendar_month_rounded),
-      (label: 'Payslip', icon: Icons.account_balance_wallet_outlined),
-    ];
-
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Container(
-        height: 58,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: cardWhite,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: borderBlue),
-          boxShadow: [
-            BoxShadow(
-              color: primaryTextBlue.withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(items.length, (index) {
-            final item = items[index];
-            final selected = _currentBottomNavIndex == index;
-            return Semantics(
-              button: true,
-              selected: selected,
-              label: item.label,
-              child: Tooltip(
-                message: item.label,
-                child: selected
-                    ? InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () => _selectNavigationItem(index),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: primaryTextBlue,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(item.icon, color: Colors.white, size: 17),
-                              const SizedBox(width: 6),
-                              Text(
-                                item.label,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : IconButton(
-                        onPressed: () => _selectNavigationItem(index),
-                        icon: Icon(item.icon, color: lightMutedBlue, size: 20),
-                        splashRadius: 20,
-                      ),
-              ),
-            );
-          }),
-        ),
-      ),
+    return ModernCurvedBottomNavBar(
+      currentIndex: _currentBottomNavIndex,
+      onTap: _selectNavigationItem,
+      items: employeeBottomNavItems,
     );
   }
 }

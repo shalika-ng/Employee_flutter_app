@@ -3,6 +3,7 @@ import 'package:flutter_redux/flutter_redux.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/modern_curved_bottom_nav.dart';
 import '../../../redux/app_state.dart';
 import '../services/attendance_request_service.dart';
 
@@ -12,11 +13,13 @@ class AttendanceRequestFormScreen extends StatefulWidget {
   const AttendanceRequestFormScreen({
     required this.type,
     required this.initialDate,
+    this.onNavigate,
     super.key,
   });
 
   final AttendanceRequestType type;
   final DateTime? initialDate;
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<AttendanceRequestFormScreen> createState() =>
@@ -120,7 +123,19 @@ class _AttendanceRequestFormScreenState
                 children: [_buildSubmittedRequestCard()],
               ),
       ),
-      bottomNavigationBar: _buildBottomBar(),
+      bottomNavigationBar: widget.onNavigate == null
+          ? _buildBottomBar()
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildBottomBar(),
+                ModernCurvedBottomNavBar(
+                  currentIndex: 1,
+                  onTap: widget.onNavigate!,
+                  items: employeeBottomNavItems,
+                ),
+              ],
+            ),
     );
   }
 
@@ -604,6 +619,7 @@ class _AttendanceRequestFormScreenState
     final requestCancelled = _requestCancelled;
     return SafeArea(
       top: false,
+      bottom: widget.onNavigate == null,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
         decoration: BoxDecoration(

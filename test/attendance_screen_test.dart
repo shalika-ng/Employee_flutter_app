@@ -80,6 +80,41 @@ void main() {
       expect(find.text(section), findsOneWidget);
     });
   }
+
+  testWidgets('request form retains navigation to the other app sections', (
+    tester,
+  ) async {
+    _setTestViewport(tester);
+    final navigatorKey = GlobalKey<NavigatorState>();
+    var selectedIndex = 1;
+
+    await tester.pumpWidget(
+      StoreProvider<AppState>(
+        store: _createStore(),
+        child: MaterialApp(
+          navigatorKey: navigatorKey,
+          home: AttendanceScreen(
+            onNavigate: (index) {
+              navigatorKey.currentState!.popUntil((route) => route.isFirst);
+              selectedIndex = index;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Apply leave'));
+    await tester.tap(find.text('Apply leave'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('New Leave Request'), findsOneWidget);
+    expect(find.byTooltip('Calendar'), findsOneWidget);
+    await tester.tap(find.byTooltip('Calendar'));
+
+    expect(selectedIndex, 3);
+    expect(navigatorKey.currentState!.canPop(), isFalse);
+  });
 }
 
 void _setTestViewport(WidgetTester tester) {

@@ -9,7 +9,9 @@ import '../redux/attendance_state.dart';
 import 'attendance_request_form_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({super.key});
+  const AttendanceScreen({this.onNavigate, super.key});
+
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
@@ -931,8 +933,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ? null
           : () => Navigator.of(context).push<void>(
               MaterialPageRoute(
-                builder: (_) =>
-                    AttendanceRequestFormScreen(type: type, initialDate: date),
+                builder: (_) => AttendanceRequestFormScreen(
+                  type: type,
+                  initialDate: date,
+                  onNavigate: widget.onNavigate,
+                ),
               ),
             ),
       icon: Icon(
