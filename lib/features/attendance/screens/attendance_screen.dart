@@ -1,12 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 
-import '../../../app/theme/app_theme.dart';
 import '../../../redux/app_state.dart';
 import '../models/attendance_models.dart';
 import '../redux/attendance_actions.dart';
 import '../redux/attendance_state.dart';
 import 'attendance_request_form_screen.dart';
+
+/// Somaflow Sage Green & Warm Parchment Design System Tokens
+class SomaflowTheme {
+  // Brand Sage Greens
+  static const Color sagePrimary = Color(0xFF6B8268);
+  static const Color sageDeep = Color(0xFF51644F);
+  static const Color sageDark = Color(0xFF384736);
+  static const Color sageMuted = Color(0xFF869984);
+  static const Color sageLight = Color(0xFFD6E0D3);
+  static const Color sageWash = Color(0xFFEAF0E8);
+
+  // Backgrounds & Surfaces
+  static const Color backgroundTop = Color(0xFFBACAB7);
+  static const Color backgroundBottom = Color(0xFFF3EFE9);
+  static const Color surfaceCard = Color(0xF8FFFFFF);
+  static const Color surfaceContainerLow = Color(0xFFFCFAF7);
+  static const Color surfaceContainer = Color(0xFFEFF4ED);
+  static const Color chipBackground = Color(0xFFEFF4ED);
+  static const Color borderLight = Color(0xFFD6DDD4);
+  static const Color borderSubtle = Color(0xFFE6ECE4);
+  static const Color warmSand = Color(0xFFD8C7B5);
+
+  // Status & Telemetry Accents
+  static const Color statusGreen = Color(0xFF388E3C);
+  static const Color statusGreenBg = Color(0xFFE8F5E9);
+  static const Color statusGreenBorder = Color(0xFFC8E6C9);
+
+  static const Color absentCoral = Color(0xFFC25D4E);
+  static const Color absentBg = Color(0xFFFDF0ED);
+  static const Color absentBorder = Color(0xFFF3D2CC);
+
+  static const Color halfDayAmber = Color(0xFF9E7B3B);
+  static const Color halfDayBg = Color(0xFFFAF4E8);
+  static const Color halfDayBorder = Color(0xFFF2E6CE);
+
+  // Typography (Charcoal & Muted Sage)
+  static const Color textCharcoal = Color(0xFF2C352B);
+  static const Color textMuted = Color(0xFF687467);
+  static const Color textSubtle = Color(0xFF8E9B8D);
+}
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({this.onNavigate, super.key});
@@ -57,6 +96,44 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _loadMonth();
   }
 
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(_month.year, _month.month, DateTime.now().day),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: SomaflowTheme.sagePrimary,
+            onPrimary: Colors.white,
+            surface: SomaflowTheme.surfaceCard,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    if (picked.month != _month.month || picked.year != _month.year) {
+      setState(() => _month = DateTime(picked.year, picked.month));
+      _loadMonth();
+    }
+    _loadDay(picked);
+  }
+
+  void _openRequest(AttendanceRequestType type, DateTime? date) {
+    if (date == null) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AttendanceRequestFormScreen(
+          type: type,
+          initialDate: date,
+          onNavigate: widget.onNavigate,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StoreConnector<AppState, AttendanceState>(
@@ -76,182 +153,405 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               SnackBar(
                 content: Text(
                   current.dayError ?? 'Unable to load day details.',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                backgroundColor: HomeTheme.accentBlue,
+                backgroundColor: SomaflowTheme.absentCoral,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             );
           });
         }
       },
       builder: (context, state) {
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [HomeTheme.backgroundTop, HomeTheme.backgroundBottom],
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(state),
-                Expanded(
-                  child: RefreshIndicator(
-                    color: HomeTheme.accentBlue,
-                    onRefresh: () async {
-                      _loadMonth();
-                      await Future<void>.delayed(
-                        const Duration(milliseconds: 350),
-                      );
-                    },
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                      children: [
-                        _buildMonthSelector(),
-                        const SizedBox(height: 14),
-                        if (state.monthData != null)
-                          _buildEmployeeCard(state.monthData!.employee),
-                        if (state.monthData != null) ...[
-                          const SizedBox(height: 14),
-                          _buildTodayCard(state.monthData!.today),
-                          const SizedBox(height: 18),
-                          _buildSummary(state.monthData!.totals),
-                          const SizedBox(height: 22),
-                        ],
-                        _buildAttendanceList(state),
-                      ],
+        return Scaffold(
+          backgroundColor: SomaflowTheme.backgroundBottom,
+          body: Stack(
+            children: [
+              // Somaflow Organic Ripples Ambient Backdrop
+              Positioned.fill(
+                child: CustomPaint(painter: _SomaflowBackgroundPainter()),
+              ),
+              SafeArea(
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    Expanded(
+                      child: RefreshIndicator(
+                        color: SomaflowTheme.sagePrimary,
+                        backgroundColor: SomaflowTheme.surfaceCard,
+                        onRefresh: () async {
+                          _loadMonth();
+                          await Future<void>.delayed(
+                            const Duration(milliseconds: 350),
+                          );
+                        },
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                          children: [
+                            if (state.monthData != null) ...[
+                              _buildEmployeeCard(state.monthData!.employee),
+                              const SizedBox(height: 14),
+                            ],
+                            _buildMonthSelector(),
+                            if (state.monthData != null) ...[
+                              const SizedBox(height: 14),
+                              _buildTodayCard(state.monthData!.today),
+                              const SizedBox(height: 18),
+                              _buildSummary(
+                                state.monthData!.totals,
+                                state.monthData!.days.length,
+                              ),
+                            ],
+                            const SizedBox(height: 20),
+                            _buildAttendanceList(state),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildHeader(AttendanceState state) {
-    final employee = state.monthData?.employee;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+  /* ------------------------------ HEADER ----------------------------- */
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: SomaflowTheme.backgroundBottom.withValues(alpha: 0.95),
+        border: const Border(
+          bottom: BorderSide(color: SomaflowTheme.borderLight, width: 1),
+        ),
+      ),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: HomeTheme.accentBlue,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.fact_check_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+          if (Navigator.of(context).canPop())
+            IconButton(
+              tooltip: 'Back',
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              color: SomaflowTheme.textCharcoal,
+            )
+          else
+            const SizedBox(width: 8),
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Attendance', style: HomeTheme.headerTitle),
                 Text(
-                  employee == null
-                      ? 'Monthly summary and daily records'
-                      : '${employee.name} · ${employee.empCode}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: HomeTheme.headerSubtitle,
+                  'WORKSPACE',
+                  style: TextStyle(
+                    color: SomaflowTheme.sagePrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                Text(
+                  'Attendance',
+                  style: TextStyle(
+                    color: SomaflowTheme.textCharcoal,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ],
             ),
           ),
           IconButton(
-            tooltip: 'Refresh attendance',
+            tooltip: 'Pick a date',
+            onPressed: _pickDate,
+            icon: const Icon(Icons.calendar_month_outlined, size: 24),
+            color: SomaflowTheme.textCharcoal,
+          ),
+          IconButton(
+            tooltip: 'Refresh',
             onPressed: _loadMonth,
-            icon: const Icon(Icons.refresh_rounded),
-            color: HomeTheme.accentBlue,
+            icon: const Icon(Icons.refresh_rounded, size: 24),
+            color: SomaflowTheme.sagePrimary,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMonthSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.calendar_month_rounded,
-            color: HomeTheme.accentBlue,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '${_monthName(_month.month)} ${_month.year}',
-              style: HomeTheme.sectionTitle,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Previous month',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => _changeMonth(-1),
-            icon: const Icon(Icons.chevron_left_rounded),
-            color: HomeTheme.accentBlue,
-          ),
-          IconButton(
-            tooltip: 'Next month',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => _changeMonth(1),
-            icon: const Icon(Icons.chevron_right_rounded),
-            color: HomeTheme.accentBlue,
-          ),
-        ],
-      ),
-    );
-  }
+  /* --------------------------- EMPLOYEE CARD ------------------------- */
 
   Widget _buildEmployeeCard(AttendanceEmployee employee) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [HomeTheme.heroGradientStart, HomeTheme.heroGradientEnd],
+          colors: [SomaflowTheme.sagePrimary, SomaflowTheme.sageDeep],
         ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 21,
-            backgroundColor: HomeTheme.heroInnerCardBackground,
-            child: Icon(Icons.person_rounded, color: Colors.white),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: SomaflowTheme.sageDeep.withValues(alpha: 0.26),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  employee.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Concentric circular ripples from Somaflow
+          Positioned(
+            right: -20,
+            bottom: -30,
+            child: Opacity(
+              opacity: 0.12,
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 20),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    width: 2,
                   ),
                 ),
-                const SizedBox(height: 3),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.white.withValues(alpha: 0.2),
+                  child: const Icon(Icons.person_rounded,
+                      color: Colors.white, size: 26),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            employee.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Icon(Icons.verified_rounded,
+                            size: 16, color: Colors.white),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${employee.designation} · ${employee.empCode}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 3.5,
+                      backgroundColor: SomaflowTheme.statusGreen,
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: SomaflowTheme.statusGreen,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* --------------------------- MONTH SELECTOR ------------------------ */
+
+  Widget _buildMonthSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: _cardDecoration(),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            tooltip: 'Previous month',
+            onPressed: () => _changeMonth(-1),
+            icon: const Icon(Icons.chevron_left_rounded, size: 28),
+            color: SomaflowTheme.sagePrimary,
+          ),
+          Row(
+            children: [
+              const Icon(Icons.calendar_month_rounded,
+                  size: 20, color: SomaflowTheme.sagePrimary),
+              const SizedBox(width: 8),
+              Text(
+                '${_monthName(_month.month)} ${_month.year}',
+                style: const TextStyle(
+                  color: SomaflowTheme.textCharcoal,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            tooltip: 'Next month',
+            onPressed: () => _changeMonth(1),
+            icon: const Icon(Icons.chevron_right_rounded, size: 28),
+            color: SomaflowTheme.sagePrimary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* ----------------------------- TODAY CARD -------------------------- */
+
+  Widget _buildTodayCard(AttendanceToday today) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "TODAY'S PRESENCE",
+                style: TextStyle(
+                  color: SomaflowTheme.sagePrimary,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              _statusPill(today.status),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _dateLabel(DateTime.now()),
+            style: const TextStyle(
+              color: SomaflowTheme.textCharcoal,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              color: SomaflowTheme.chipBackground,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: SomaflowTheme.borderLight),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: SomaflowTheme.sageDark.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.fingerprint_rounded,
+                      color: SomaflowTheme.sagePrimary, size: 26),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Last punch',
+                        style: TextStyle(
+                          color: SomaflowTheme.textCharcoal,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'Biometric Turnstile',
+                        style: TextStyle(
+                          color: SomaflowTheme.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Text(
-                  '${employee.designation} · ${employee.empCode}',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  _formatTime(today.lastPunch),
+                  style: const TextStyle(
+                    color: SomaflowTheme.sageDeep,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ],
             ),
@@ -261,55 +561,39 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Widget _buildTodayCard(AttendanceToday today) {
-    final isIn = today.status.toUpperCase() == 'IN';
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: HomeTheme.chipBlueBackground,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              isIn ? Icons.login_rounded : Icons.schedule_rounded,
-              color: HomeTheme.accentBlue,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(child: Text('Today', style: HomeTheme.cardTitle)),
-          _statusPill(today.status),
-          if (today.lastPunch != null) ...[
-            const SizedBox(width: 8),
-            Text(
-              _formatTime(today.lastPunch),
-              style: const TextStyle(
-                color: HomeTheme.secondaryText,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  /* ------------------------------ SUMMARY ---------------------------- */
 
-  Widget _buildSummary(AttendanceTotals totals) {
-    final items = [
-      ('Present', totals.present.toString(), Icons.check_circle_outline),
-      ('Half day', totals.half.toString(), Icons.timelapse_rounded),
-      ('Leave', totals.leave.toString(), Icons.event_busy_outlined),
-      ('Work time', _formatDuration(totals.workMinutes), Icons.schedule),
+  Widget _buildSummary(AttendanceTotals totals, int totalDays) {
+    final pct = totalDays == 0
+        ? 0
+        : ((totals.present / totalDays) * 100).round().clamp(0, 100);
+
+    final items = <_Metric>[
+      _Metric('Present Days', '${totals.present}', '/$totalDays',
+          Icons.check_circle_outline_rounded, '$pct%',
+          SomaflowTheme.statusGreen, SomaflowTheme.statusGreenBg),
+      _Metric('Productive Hours', '${totals.workMinutes ~/ 60}h',
+          ' ${totals.workMinutes % 60}m', Icons.schedule_rounded, null,
+          SomaflowTheme.sagePrimary, SomaflowTheme.chipBackground),
+      _Metric('Leaves Taken', totals.leave.toString().padLeft(2, '0'), '',
+          Icons.event_busy_outlined, null,
+          SomaflowTheme.absentCoral, SomaflowTheme.absentBg),
+      _Metric('Half Days', totals.half.toString().padLeft(2, '0'), '',
+          Icons.hourglass_empty_rounded, null,
+          SomaflowTheme.halfDayAmber, SomaflowTheme.halfDayBg),
     ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Monthly summary', style: HomeTheme.sectionTitle),
+        const Text(
+          'Monthly Pulse',
+          style: TextStyle(
+            color: SomaflowTheme.textCharcoal,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
         const SizedBox(height: 10),
         GridView.builder(
           shrinkWrap: true,
@@ -319,42 +603,77 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            mainAxisExtent: 82,
+            mainAxisExtent: 118,
           ),
           itemBuilder: (context, index) {
-            final item = items[index];
+            final m = items[index];
             return Container(
               padding: const EdgeInsets.all(12),
               decoration: _cardDecoration(),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: HomeTheme.chipBlueBackground,
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: Icon(item.$3, color: HomeTheme.accentBlue, size: 19),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          item.$2,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: HomeTheme.primaryText,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: m.bg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(m.icon, color: m.color, size: 19),
+                      ),
+                      if (m.badge != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: m.bg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            m.badge!,
+                            style: TextStyle(
+                              color: m.color,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
-                        Text(item.$1, style: HomeTheme.caption),
+                    ],
+                  ),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: m.value,
+                          style: const TextStyle(
+                            color: SomaflowTheme.textCharcoal,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (m.suffix.isNotEmpty)
+                          TextSpan(
+                            text: m.suffix,
+                            style: const TextStyle(
+                              color: SomaflowTheme.textMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                       ],
+                    ),
+                  ),
+                  Text(
+                    m.label,
+                    style: const TextStyle(
+                      color: SomaflowTheme.textMuted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -366,13 +685,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
+  /* ----------------------------- DAY LIST ---------------------------- */
+
   Widget _buildAttendanceList(AttendanceState state) {
     if (state.monthStatus == AttendanceLoadStatus.loading &&
         state.monthData == null) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
+        padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
-          child: CircularProgressIndicator(color: HomeTheme.accentBlue),
+          child: CircularProgressIndicator(color: SomaflowTheme.sagePrimary),
         ),
       );
     }
@@ -392,7 +713,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         Row(
           children: [
             const Expanded(
-              child: Text('Attendance history', style: HomeTheme.sectionTitle),
+              child: Text(
+                'Daily Logs',
+                style: TextStyle(
+                  color: SomaflowTheme.textCharcoal,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
             if (state.monthStatus == AttendanceLoadStatus.loading)
               const SizedBox(
@@ -400,7 +728,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: HomeTheme.accentBlue,
+                  color: SomaflowTheme.sagePrimary,
                 ),
               ),
           ],
@@ -411,10 +739,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ],
         const SizedBox(height: 10),
         if (days.isEmpty && state.monthStatus == AttendanceLoadStatus.success)
-          _emptyCard('No attendance records for this month.'),
+          _emptyCard('No attendance records found for this month.'),
         ...days.map(
           (day) => Padding(
-            padding: const EdgeInsets.only(bottom: 9),
+            padding: const EdgeInsets.only(bottom: 10),
             child: _dayCard(day, state),
           ),
         ),
@@ -423,150 +751,175 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _dayCard(AttendanceDaySummary day, AttendanceState state) {
-    final dateKey = day.workDate == null ? '' : _dateKey(day.workDate!);
-    final selected = state.selectedDate == dateKey;
+    final date = day.workDate;
+    final dateKey = date == null ? '' : _dateKey(date);
+    final selected = dateKey.isNotEmpty && state.selectedDate == dateKey;
+    final absent = _isAbsent(day);
     final showRegularization = _shouldShowRegularization(day);
     final showLopActions = _hasLop(day);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(17),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(
-            color: selected ? HomeTheme.accentBlue : HomeTheme.borderBlue,
-            width: selected ? 1.5 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: HomeTheme.primaryText.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+
+    final String subtitle;
+    final Color subtitleColor;
+    if (absent) {
+      subtitle = 'No punches recorded';
+      subtitleColor = SomaflowTheme.absentCoral;
+    } else if (day.needsRegularization) {
+      subtitle = 'Needs regularization';
+      subtitleColor = SomaflowTheme.halfDayAmber;
+    } else if (day.isLate) {
+      subtitle = 'Late check-in';
+      subtitleColor = SomaflowTheme.absentCoral;
+    } else {
+      subtitle = 'Regular shift';
+      subtitleColor = SomaflowTheme.textMuted;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: SomaflowTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected ? SomaflowTheme.sagePrimary : SomaflowTheme.borderLight,
+          width: selected ? 1.6 : 1,
         ),
-        child: Column(
-          children: [
-            InkWell(
-              borderRadius: BorderRadius.circular(17),
-              onTap: dateKey.isEmpty ? null : () => _loadDay(day.workDate!),
-              child: Padding(
-                padding: const EdgeInsets.all(13),
-                child: Column(
+        boxShadow: [
+          BoxShadow(
+            color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: date == null ? null : () => _loadDay(date),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        _dateBadge(day.workDate),
-                        const SizedBox(width: 11),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _dateLabel(day.workDate),
-                                style: const TextStyle(
-                                  color: HomeTheme.primaryText,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                'IN  ${_formatTime(day.firstIn)}    OUT  ${_formatTime(day.lastOut)}',
-                                style: const TextStyle(
-                                  color: HomeTheme.secondaryText,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _dateLabel(date),
+                            style: const TextStyle(
+                              color: SomaflowTheme.textCharcoal,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
-                        ),
-                        _statusPill(day.status),
-                      ],
-                    ),
-                    const SizedBox(height: 11),
-                    Row(
-                      children: [
-                        _smallMetric(
-                          Icons.timer_outlined,
-                          _formatDuration(day.workMinutes),
-                        ),
-                        const SizedBox(width: 16),
-                        if (showLopActions)
-                          _smallMetric(
-                            Icons.remove_circle_outline,
-                            'LOP ${day.lopValue}',
-                            color: const Color(0xFFB45309),
-                          ),
-                        if (day.isLate) ...[
-                          const SizedBox(width: 12),
-                          _smallMetric(
-                            Icons.schedule,
-                            'Late',
-                            color: const Color(0xFFB45309),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: subtitleColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
-                        if (day.needsRegularization) ...[
-                          const SizedBox(width: 12),
-                          _smallMetric(
-                            Icons.info_outline,
-                            'Review',
-                            color: const Color(0xFFB45309),
-                          ),
-                        ],
-                        const Spacer(),
-                        Icon(
-                          selected
-                              ? Icons.keyboard_arrow_up_rounded
-                              : Icons.chevron_right_rounded,
-                          color: HomeTheme.lightMutedBlue,
-                          size: 20,
-                        ),
-                      ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    _statusPill(day.status),
                   ],
                 ),
-              ),
-            ),
-            if (showRegularization || showLopActions)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(13, 0, 13, 12),
-                child: Align(
-                  alignment: Alignment.centerRight,
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: SomaflowTheme.chipBackground,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 7,
-                    runSpacing: 7,
+                    spacing: 14,
+                    runSpacing: 6,
+                    children: [
+                      Text(
+                        'IN  ${_formatTime(day.firstIn)}',
+                        style: const TextStyle(
+                          color: SomaflowTheme.sageDeep,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'OUT  ${_formatTime(day.lastOut)}',
+                        style: const TextStyle(
+                          color: SomaflowTheme.textMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        _formatDuration(day.workMinutes),
+                        style: const TextStyle(
+                          color: SomaflowTheme.sageDeep,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (day.isLate || showLopActions) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      if (day.isLate) _flagChip('Late'),
+                      if (showLopActions) _lopChip(day.lopValue),
+                    ],
+                  ),
+                ],
+                if (showRegularization || showLopActions) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       if (showRegularization)
                         _requestAction(
-                          'Apply regularization',
+                          'Apply Regularization',
                           AttendanceRequestType.regularization,
-                          day.workDate,
+                          date,
+                          isSolid: true,
                         ),
                       if (showLopActions) ...[
                         _requestAction(
-                          'Apply leave',
+                          'Apply Leave',
                           AttendanceRequestType.leave,
-                          day.workDate,
+                          date,
                         ),
                         _requestAction(
-                          'Apply permission',
+                          'Permission',
                           AttendanceRequestType.permission,
-                          day.workDate,
+                          date,
                         ),
                       ],
                     ],
                   ),
-                ),
-              ),
-          ],
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+
+  /* --------------------------- DAY DETAIL SHEET ---------------------- */
 
   void _showDayPopup(AttendanceDayData data) {
     final date = DateTime.tryParse(data.date);
@@ -585,31 +938,48 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         heightFactor: 0.86,
         child: Container(
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: SomaflowTheme.backgroundBottom,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border(
+              top: BorderSide(color: SomaflowTheme.borderLight, width: 1.5),
+            ),
           ),
           child: Column(
             children: [
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: SomaflowTheme.borderLight,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+                padding: const EdgeInsets.fromLTRB(20, 14, 12, 10),
                 child: Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const Text(
+                            'SHIFT AUDIT LOG',
+                            style: TextStyle(
+                              color: SomaflowTheme.sagePrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
                           Text(
                             date == null
-                                ? 'Attendance details'
-                                : _weekdayName(date.weekday),
-                            style: HomeTheme.pageTitle,
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            data.date,
+                                ? 'Attendance Details'
+                                : '${_weekdayName(date.weekday)}, ${data.date}',
                             style: const TextStyle(
-                              color: HomeTheme.secondaryText,
-                              fontSize: 13,
+                              color: SomaflowTheme.textCharcoal,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ],
@@ -620,34 +990,41 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close_rounded),
                       style: IconButton.styleFrom(
-                        backgroundColor: HomeTheme.chipBlueBackground,
-                        foregroundColor: HomeTheme.secondaryText,
+                        backgroundColor: SomaflowTheme.chipBackground,
+                        foregroundColor: SomaflowTheme.textCharcoal,
                       ),
                     ),
                   ],
                 ),
               ),
+              const Divider(height: 1, color: SomaflowTheme.borderLight),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
                   child: _buildDayDetails(dayState),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: SomaflowTheme.borderLight)),
+                ),
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () => Navigator.pop(context),
                     style: FilledButton.styleFrom(
-                      backgroundColor: HomeTheme.accentBlue,
+                      backgroundColor: SomaflowTheme.sagePrimary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size.fromHeight(50),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Text('Close'),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
               ),
@@ -662,8 +1039,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (state.dayStatus == AttendanceLoadStatus.loading) {
       return const Center(
         child: Padding(
-          padding: EdgeInsets.all(20),
-          child: CircularProgressIndicator(color: HomeTheme.accentBlue),
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(color: SomaflowTheme.sagePrimary),
         ),
       );
     }
@@ -683,6 +1060,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final data = state.dayData;
     if (data == null) return const SizedBox.shrink();
     final summary = data.summary;
+
+    Widget title(String t) => Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            t,
+            style: const TextStyle(
+              color: SomaflowTheme.textCharcoal,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        );
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(),
@@ -692,13 +1082,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           Row(
             children: [
               const Expanded(
-                child: Text('Day details', style: HomeTheme.sectionTitle),
+                child: Text(
+                  'Daily Metric Summary',
+                  style: TextStyle(
+                    color: SomaflowTheme.textCharcoal,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
               Text(
                 data.date,
                 style: const TextStyle(
-                  color: HomeTheme.secondaryText,
-                  fontSize: 11,
+                  color: SomaflowTheme.textMuted,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -708,7 +1105,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           if (summary == null)
             const Text(
               'No day summary is available.',
-              style: TextStyle(color: HomeTheme.secondaryText, fontSize: 12),
+              style: TextStyle(color: SomaflowTheme.textMuted, fontSize: 14),
             )
           else ...[
             Row(
@@ -720,20 +1117,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ],
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _detailPair('First in', _formatTime(summary.firstIn)),
             _detailPair('Last out', _formatTime(summary.lastOut)),
-            _detailPair('Break', _formatDuration(summary.breakMinutes)),
+            _detailPair('Break time', _formatDuration(summary.breakMinutes)),
             _detailPair(
-              'Permission',
+              'Permission duration',
               _formatDuration(summary.permissionMinutes),
             ),
           ],
           if (data.sessions.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 18),
-            const Text('Sessions', style: HomeTheme.subsectionTitle),
-            const SizedBox(height: 6),
+            const Divider(height: 28, color: SomaflowTheme.borderLight),
+            title('Recorded Sessions'),
             ...data.sessions.map(
               (session) => _detailPair(
                 session.flag ?? 'Session',
@@ -743,70 +1138,45 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
           ],
           if (data.punches.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 18),
-            const Text('Punch log', style: HomeTheme.subsectionTitle),
-            const SizedBox(height: 6),
+            const Divider(height: 28, color: SomaflowTheme.borderLight),
+            title('Biometric Punch Log'),
             ...data.punches.map(
               (punch) => _detailPair(
                 '${punch.direction}${punch.isCorrection ? ' · Correction' : ''}',
                 '${_formatTime(punch.punchedAt)}'
-                    '${punch.sourceType.isEmpty ? '' : ' · ${punch.sourceType}'}',
-              ),
-            ),
-          ],
-          if (data.punches.isEmpty) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 18),
-            const Text('Punch log', style: HomeTheme.subsectionTitle),
-            const SizedBox(height: 8),
-            const Text(
-              '—',
-              style: TextStyle(
-                color: HomeTheme.secondaryText,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+                '${punch.sourceType.isEmpty ? '' : ' · ${punch.sourceType}'}',
               ),
             ),
           ],
           if (data.breakGaps.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 18),
-            const Text('Break gaps', style: HomeTheme.subsectionTitle),
-            const SizedBox(height: 6),
+            const Divider(height: 28, color: SomaflowTheme.borderLight),
+            title('Break Gaps'),
             ...data.breakGaps.indexed.map(
-              (entry) => _detailPair(
-                'Break ${entry.$1 + 1}',
-                _formatAttributes(entry.$2),
-              ),
+              (e) => _detailPair('Break ${e.$1 + 1}', _formatAttributes(e.$2)),
             ),
           ],
           if (data.permissions.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 18),
-            const Text('Permissions', style: HomeTheme.subsectionTitle),
-            const SizedBox(height: 6),
+            const Divider(height: 28, color: SomaflowTheme.borderLight),
+            title('Permissions'),
             ...data.permissions.indexed.map(
-              (entry) => _detailPair(
-                'Permission ${entry.$1 + 1}',
-                _formatAttributes(entry.$2),
-              ),
+              (e) =>
+                  _detailPair('Permission ${e.$1 + 1}', _formatAttributes(e.$2)),
             ),
           ],
           if (data.flags.needsRegularization ||
               data.flags.isLate ||
               data.flags.excessBreak ||
               data.flags.isLocked) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
                 if (data.flags.needsRegularization)
                   _flagChip('Needs regularization'),
-                if (data.flags.isLate) _flagChip('Late'),
+                if (data.flags.isLate) _flagChip('Late punch'),
                 if (data.flags.excessBreak) _flagChip('Excess break'),
-                if (data.flags.isLocked) _flagChip('Locked'),
+                if (data.flags.isLocked) _flagChip('Record locked'),
               ],
             ),
           ],
@@ -817,15 +1187,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _detailPair(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Expanded(
             child: Text(
               label,
               style: const TextStyle(
-                color: HomeTheme.secondaryText,
-                fontSize: 11,
+                color: SomaflowTheme.textMuted,
+                fontSize: 14,
               ),
             ),
           ),
@@ -833,40 +1203,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             value,
             textAlign: TextAlign.right,
             style: const TextStyle(
-              color: HomeTheme.primaryText,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _dateBadge(DateTime? date) {
-    return Container(
-      width: 42,
-      height: 46,
-      decoration: BoxDecoration(
-        color: HomeTheme.chipBlueBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            date == null ? '—' : date.day.toString().padLeft(2, '0'),
-            style: const TextStyle(
-              color: HomeTheme.accentBlue,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          Text(
-            date == null ? '' : _weekdayShort(date.weekday),
-            style: const TextStyle(
-              color: HomeTheme.secondaryText,
-              fontSize: 8,
+              color: SomaflowTheme.textCharcoal,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -875,88 +1213,119 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
+  /* ----------------------------- SMALL PIECES ------------------------ */
+
   Widget _statusPill(String status) {
     final upper = status.toUpperCase();
-    final (Color foreground, Color background) = switch (upper) {
-      'PRESENT' || 'IN' => (const Color(0xFF167447), const Color(0xFFE6F7EE)),
-      'LEAVE' => (const Color(0xFF315D8A), const Color(0xFFEAF2FB)),
-      'WEEKLY_OFF' ||
-      'HOLIDAY' => (HomeTheme.secondaryText, HomeTheme.chipBlueBackground),
-      'HALF_DAY' => (const Color(0xFF9A6700), const Color(0xFFFFF5D6)),
-      'INSUFFICIENT' ||
-      'ABSENT' ||
-      'OUT' => (const Color(0xFFB42336), const Color(0xFFFFEBEE)),
-      _ => (HomeTheme.secondaryText, HomeTheme.chipBlueBackground),
-    };
+    final Color fg;
+    final Color bg;
+    final Color bd;
+
+    if (upper.contains('PRESENT') || upper == 'IN') {
+      fg = SomaflowTheme.statusGreen;
+      bg = SomaflowTheme.statusGreenBg;
+      bd = SomaflowTheme.statusGreenBorder;
+    } else if (upper.contains('HALF')) {
+      fg = SomaflowTheme.halfDayAmber;
+      bg = SomaflowTheme.halfDayBg;
+      bd = SomaflowTheme.halfDayBorder;
+    } else if (upper == 'LEAVE' ||
+        upper == 'ABSENT' ||
+        upper == 'OUT' ||
+        upper == 'INSUFFICIENT') {
+      fg = SomaflowTheme.absentCoral;
+      bg = SomaflowTheme.absentBg;
+      bd = SomaflowTheme.absentBorder;
+    } else {
+      fg = SomaflowTheme.textMuted;
+      bg = SomaflowTheme.chipBackground;
+      bd = SomaflowTheme.borderLight;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(20),
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: bd),
       ),
       child: Text(
-        status.replaceAll('_', ' '),
+        _statusLabel(status),
         style: TextStyle(
-          color: foreground,
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
+          color: fg,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
         ),
       ),
-    );
-  }
-
-  Widget _smallMetric(IconData icon, String label, {Color? color}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: color ?? HomeTheme.secondaryText),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: color ?? HomeTheme.secondaryText,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 
   Widget _requestAction(
     String label,
     AttendanceRequestType type,
-    DateTime? date,
-  ) {
-    return OutlinedButton.icon(
-      onPressed: date == null
-          ? null
-          : () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) => AttendanceRequestFormScreen(
-                  type: type,
-                  initialDate: date,
-                  onNavigate: widget.onNavigate,
-                ),
-              ),
-            ),
+    DateTime? date, {
+    bool isSolid = false,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: date == null ? null : () => _openRequest(type, date),
       icon: Icon(
-        type == AttendanceRequestType.leave
-            ? Icons.event_available_outlined
-            : type == AttendanceRequestType.permission
-            ? Icons.access_time_rounded
-            : Icons.edit_calendar_outlined,
-        size: 15,
+        type == AttendanceRequestType.regularization
+            ? Icons.edit_calendar_outlined
+            : type == AttendanceRequestType.leave
+                ? Icons.event_available_outlined
+                : Icons.description_outlined,
+        size: 16,
       ),
       label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: HomeTheme.accentBlue,
-        backgroundColor: HomeTheme.chipBlueBackground,
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        side: BorderSide.none,
-        visualDensity: VisualDensity.compact,
-        textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      style: ElevatedButton.styleFrom(
+        foregroundColor: isSolid ? Colors.white : SomaflowTheme.sageDeep,
+        backgroundColor:
+            isSolid ? SomaflowTheme.sagePrimary : SomaflowTheme.chipBackground,
+        elevation: isSolid ? 1 : 0,
+        side: isSolid
+            ? BorderSide.none
+            : const BorderSide(color: SomaflowTheme.borderLight),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Widget _flagChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: SomaflowTheme.halfDayBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: SomaflowTheme.halfDayBorder),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: SomaflowTheme.halfDayAmber,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _lopChip(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: SomaflowTheme.absentBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: SomaflowTheme.absentBorder),
+      ),
+      child: Text(
+        'LOP $value',
+        style: const TextStyle(
+          color: SomaflowTheme.absentCoral,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -965,22 +1334,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F2),
-        borderRadius: BorderRadius.circular(16),
+        color: SomaflowTheme.absentBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SomaflowTheme.absentBorder),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFB42336), size: 19),
-          const SizedBox(width: 9),
+          const Icon(Icons.error_outline,
+              color: SomaflowTheme.absentCoral, size: 22),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 11),
+              style: const TextStyle(
+                color: SomaflowTheme.absentCoral,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           TextButton(
             onPressed: onRetry,
-            child: const Text('Retry', style: TextStyle(fontSize: 11)),
+            child: const Text(
+              'Retry',
+              style: TextStyle(
+                color: SomaflowTheme.absentCoral,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
           ),
         ],
       ),
@@ -989,70 +1371,104 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _emptyCard(String message) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: _cardDecoration(),
-      child: Center(
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: HomeTheme.secondaryText, fontSize: 12),
-        ),
-      ),
-    );
-  }
-
-  Widget _flagChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF5D6),
-        borderRadius: BorderRadius.circular(20),
-      ),
       child: Text(
-        label,
+        message,
+        textAlign: TextAlign.center,
         style: const TextStyle(
-          color: Color(0xFF9A6700),
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  Widget _lopChip(String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFE4E6),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        'LOP $value',
-        style: const TextStyle(
-          color: Color(0xFFB42336),
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
+          color: SomaflowTheme.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
 
   BoxDecoration _cardDecoration() => BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(17),
-    border: Border.all(color: HomeTheme.borderBlue),
-    boxShadow: [
-      BoxShadow(
-        color: HomeTheme.primaryText.withValues(alpha: 0.05),
-        blurRadius: 12,
-        offset: const Offset(0, 4),
-      ),
-    ],
-  );
+        color: SomaflowTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SomaflowTheme.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      );
 }
 
-bool _shouldShowRegularization(AttendanceDaySummary day) =>
-    day.needsRegularization || day.firstIn == null || day.lastOut == null;
+class _Metric {
+  const _Metric(
+    this.label,
+    this.value,
+    this.suffix,
+    this.icon,
+    this.badge,
+    this.color,
+    this.bg,
+  );
+
+  final String label, value, suffix;
+  final IconData icon;
+  final String? badge;
+  final Color color, bg;
+}
+
+/// Somaflow ambient organic ripples
+class _SomaflowBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintSage = Paint()
+      ..color = SomaflowTheme.sageMuted.withValues(alpha: 0.16)
+      ..style = PaintingStyle.fill;
+    final paintSand = Paint()
+      ..color = SomaflowTheme.warmSand.withValues(alpha: 0.14)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, 0)
+        ..cubicTo(size.width * 0.45, 0, size.width * 0.55, size.height * 0.18, 0,
+            size.height * 0.28)
+        ..close(),
+      paintSage,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.5, 0)
+        ..cubicTo(size.width * 0.75, size.height * 0.08, size.width,
+            size.height * 0.04, size.width, size.height * 0.20)
+        ..lineTo(size.width, 0)
+        ..close(),
+      paintSand,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+bool _isAbsent(AttendanceDaySummary day) {
+  final s = day.status.toUpperCase();
+  if (s == 'ABSENT') return true;
+  const nonWorking = {'WEEKLY_OFF', 'HOLIDAY', 'LEAVE', 'HALF_DAY'};
+  return !nonWorking.contains(s) && day.firstIn == null && day.lastOut == null;
+}
+
+bool _shouldShowRegularization(AttendanceDaySummary day) {
+  final s = day.status.toUpperCase();
+  if (s == 'WEEKLY_OFF' || s == 'HOLIDAY' || s == 'LEAVE') {
+    return day.needsRegularization;
+  }
+  return day.needsRegularization || day.firstIn == null || day.lastOut == null;
+}
 
 bool _hasLop(AttendanceDaySummary day) =>
     (double.tryParse(day.lopValue) ?? 0) > 0;
@@ -1066,6 +1482,12 @@ String _dateLabel(DateTime? date) {
   if (date == null) return 'Date unavailable';
   return '${_weekdayName(date.weekday)}, ${_monthName(date.month)} ${date.day}';
 }
+
+String _statusLabel(String status) => status
+    .toLowerCase()
+    .split('_')
+    .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+    .join(' ');
 
 String _formatTime(DateTime? date) {
   if (date == null) return '—';
@@ -1086,37 +1508,34 @@ String _formatDuration(int minutes) {
 
 String _formatAttributes(Map<String, dynamic> attributes) {
   final values = attributes.entries
-      .where((entry) => entry.value != null)
-      .map((entry) => '${entry.key.replaceAll('_', ' ')}: ${entry.value}')
+      .where((e) => e.value != null)
+      .map((e) => '${e.key.replaceAll('_', ' ')}: ${e.value}')
       .take(3)
       .toList();
   return values.isEmpty ? '—' : values.join(' · ');
 }
 
 String _monthName(int month) => const [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-][month - 1];
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ][month - 1];
 
 String _weekdayName(int weekday) => const [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-][weekday - 1];
-
-String _weekdayShort(int weekday) =>
-    const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][weekday - 1];
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ][weekday - 1];

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_redux/flutter_redux.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // NEW: For session locking
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
@@ -13,6 +13,45 @@ import '../../attendance/screens/attendance_screen.dart';
 import '../../auth/redux/auth_actions.dart';
 import '../models/dashboard_model.dart';
 import '../services/dashboard_service.dart';
+
+/// Exact Somaflow Sage Green & Warm Parchment Tokens
+class SomaflowTheme {
+  // Backgrounds & Atmospheres (Gradient from sage mist to warm parchment)
+  static const Color backgroundTop = Color(0xFFBACAB7);
+  static const Color backgroundBottom = Color(0xFFF3EFE9);
+  static const Color surfaceOatmeal = Color(0xFFFCFAF7);
+  static const Color cardFrosted = Color(0xF5FFFFFF);
+  static const Color cardTinted = Color(0xFFEFF4ED);
+
+  // Somaflow Sage Greens
+  static const Color sagePrimary = Color(0xFF6B8268);
+  static const Color sageDeep = Color(0xFF51644F);
+  static const Color sageDark = Color(0xFF384736);
+  static const Color sageMuted = Color(0xFF869984);
+  static const Color sageLight = Color(0xFFD6E0D3);
+  static const Color sageWash = Color(0xFFEAF0E8);
+
+  // Soft Borders & Warm Accents
+  static const Color borderLight = Color(0xFFD6DDD4);
+  static const Color borderSubtle = Color(0xFFE6ECE4);
+  static const Color warmSand = Color(0xFFD8C7B5);
+
+  // Telemetry & Status Badges
+  static const Color statusGreen = Color(0xFF388E3C);
+  static const Color statusGreenBg = Color(0xFFE8F5E9);
+  static const Color statusGreenBorder = Color(0xFFC8E6C9);
+
+  static const Color lopCoral = Color(0xFFC25D4E);
+  static const Color lopCoralBg = Color(0xFFFDF0ED);
+
+  static const Color holidayGold = Color(0xFF9E7B3B);
+  static const Color holidayGoldBg = Color(0xFFFAF4E8);
+
+  // Typography (Charcoal & Muted Sage from reference)
+  static const Color textCharcoal = Color(0xFF2C352B);
+  static const Color textMuted = Color(0xFF687467);
+  static const Color textSubtle = Color(0xFF8E9B8D);
+}
 
 // --- Quote Model ---
 class Quote {
@@ -50,7 +89,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Mindful Daily Dashboard',
-      theme: ThemeData(fontFamily: HomeTheme.fontFamily, useMaterial3: true),
+      theme: ThemeData(
+        fontFamily: HomeTheme.fontFamily,
+        useMaterial3: true,
+        scaffoldBackgroundColor: SomaflowTheme.backgroundBottom,
+      ),
       home: const HomeScreen(),
     );
   }
@@ -68,28 +111,13 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasOpenedAttendance = false;
 
   // --- Mood & Quote State ---
-  int? _selectedMoodIndex; // Changed to int? (null means no mood picked)
-  bool _isSessionLocked = false; // Tracks if the session is locked
+  int? _selectedMoodIndex;
+  bool _isSessionLocked = false;
   List<Quote> _allQuotes = [];
   Quote? _currentQuote;
   bool _isLoadingQuotes = true;
   String? _dashboardToken;
   Future<DashboardData>? _dashboardFuture;
-
-  // --- Exact Colors from Image ---
-  static const Color backgroundGradientTop = HomeTheme.backgroundTop;
-  static const Color backgroundGradientBottom = HomeTheme.backgroundBottom;
-  static const Color heroGradientStart = HomeTheme.heroGradientStart;
-  static const Color heroGradientEnd = HomeTheme.heroGradientEnd;
-  static const Color heroInnerCardBg = HomeTheme.heroInnerCardBackground;
-  static const Color primaryTextBlue = HomeTheme.primaryText;
-  static const Color secondaryTextBlue = HomeTheme.secondaryText;
-  static const Color accentBlue = HomeTheme.accentBlue;
-  static const Color chipBlueBg = HomeTheme.chipBlueBackground;
-  static const Color borderBlue = HomeTheme.borderBlue;
-  static const Color icyMutedBlue = HomeTheme.icyMutedBlue;
-  static const Color lightMutedBlue = HomeTheme.lightMutedBlue;
-  static const Color cardWhite = Colors.white;
 
   // Moods mapped to JSON 'moods' array IDs
   final List<Map<String, dynamic>> _moods = [
@@ -133,7 +161,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       final List<dynamic> data = json.decode(response);
 
-      // Load Local Storage Session
       final prefs = await SharedPreferences.getInstance();
       final int? savedRating = prefs.getInt('saved_rating');
       final int? savedQuoteId = prefs.getInt('saved_quote_id');
@@ -141,10 +168,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _allQuotes = data.map((json) => Quote.fromJson(json)).toList();
 
-        // If a session exists, lock it in
         if (savedRating != null && savedQuoteId != null) {
-          _selectedMoodIndex =
-              savedRating - 1; // Convert 1-based to 0-based index
+          _selectedMoodIndex = savedRating - 1;
           _currentQuote = _allQuotes.firstWhere(
             (q) => q.id == savedQuoteId,
             orElse: () => _allQuotes.first,
@@ -161,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Handle emoji click (locks the quote)
   Future<void> _handleRatingClick(int index) async {
-    if (_isSessionLocked) return; // Prevent clicking if already locked
+    if (_isSessionLocked) return;
 
     final int moodId = _moods[index]['moodId'];
     final matchingQuotes = _allQuotes
@@ -178,7 +203,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _isSessionLocked = true;
       });
 
-      // Save to local storage
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('saved_rating', index + 1);
       await prefs.setInt('saved_quote_id', newQuote.id);
@@ -201,27 +225,38 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentBottomNavIndex,
+      backgroundColor: SomaflowTheme.backgroundBottom,
+      body: Stack(
         children: [
-          _buildDashboardPage(),
-          _hasOpenedAttendance
-              ? AttendanceScreen(onNavigate: _navigateFromNestedPage)
-              : const SizedBox.shrink(),
-          _buildSectionPage(
-            title: 'Requests',
-            description: 'Your leave and other requests will appear here.',
-            icon: Icons.assignment_outlined,
+          // Somaflow Ambient Waves Backdrop
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _SomaflowBackgroundPainter(),
+            ),
           ),
-          _buildSectionPage(
-            title: 'Calendar',
-            description: 'Your shifts and important dates will appear here.',
-            icon: Icons.calendar_month_rounded,
-          ),
-          _buildSectionPage(
-            title: 'Payslip',
-            description: 'Your payslips will appear here.',
-            icon: Icons.account_balance_wallet_outlined,
+          IndexedStack(
+            index: _currentBottomNavIndex,
+            children: [
+              _buildDashboardPage(),
+              _hasOpenedAttendance
+                  ? AttendanceScreen(onNavigate: _navigateFromNestedPage)
+                  : const SizedBox.shrink(),
+              _buildSectionPage(
+                title: 'Requests',
+                description: 'Your leave and other requests will appear here.',
+                icon: Icons.assignment_outlined,
+              ),
+              _buildSectionPage(
+                title: 'Calendar',
+                description: 'Your shifts and important dates will appear here.',
+                icon: Icons.calendar_month_rounded,
+              ),
+              _buildSectionPage(
+                title: 'Payslip',
+                description: 'Your payslips will appear here.',
+                icon: Icons.account_balance_wallet_outlined,
+              ),
+            ],
           ),
         ],
       ),
@@ -242,62 +277,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDashboardPage() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [backgroundGradientTop, backgroundGradientBottom],
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: FutureBuilder<DashboardData>(
-          future: _dashboardFuture,
-          builder: (context, snapshot) {
-            final data = snapshot.data;
-            final error = snapshot.error;
-            return Column(
-              children: [
-                _buildTopAppBar(data),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (snapshot.connectionState ==
-                                ConnectionState.waiting &&
-                            _dashboardFuture != null)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 10),
-                            child: LinearProgressIndicator(
-                              color: heroGradientStart,
-                              backgroundColor: Colors.white70,
-                            ),
+    return SafeArea(
+      bottom: false,
+      child: FutureBuilder<DashboardData>(
+        future: _dashboardFuture,
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          final error = snapshot.error;
+          return Column(
+            children: [
+              _buildTopAppBar(data),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          _dashboardFuture != null)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 10),
+                          child: LinearProgressIndicator(
+                            color: SomaflowTheme.sagePrimary,
+                            backgroundColor: SomaflowTheme.sageWash,
                           ),
-                        if (error != null) _buildDashboardError(error),
-                        _buildGreetingShiftCard(data),
-                        const SizedBox(height: 14),
-                        _buildMoodCheckInCard(),
+                        ),
+                      if (error != null) _buildDashboardError(error),
+                      _buildGreetingShiftCard(data),
+                      const SizedBox(height: 14),
+                      _buildMoodCheckInCard(),
+                      const SizedBox(height: 18),
+                      _buildMonthlySnapshotSection(data),
+                      if (data != null) ...[
                         const SizedBox(height: 18),
-                        _buildMonthlySnapshotSection(data),
-                        if (data != null) ...[
-                          const SizedBox(height: 18),
-                          _buildUpcomingEvents(data),
-                        ],
-                        const SizedBox(height: 14),
-                        _buildQuickActionBanner(),
-                        const SizedBox(height: 84),
+                        _buildUpcomingEvents(data),
                       ],
-                    ),
+                      const SizedBox(height: 14),
+                      _buildQuickActionBanner(),
+                      const SizedBox(height: 84),
+                    ],
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -310,18 +335,29 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F0),
-        borderRadius: BorderRadius.circular(12),
+        color: SomaflowTheme.lopCoralBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF3D2CC)),
       ),
       child: Row(
         children: [
+          const Icon(Icons.error_outline_rounded, color: SomaflowTheme.lopCoral, size: 20),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFF9F2D25), fontSize: 12),
+              style: const TextStyle(
+                color: SomaflowTheme.lopCoral,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          TextButton(onPressed: _retryDashboard, child: const Text('Retry')),
+          TextButton(
+            onPressed: _retryDashboard,
+            style: TextButton.styleFrom(foregroundColor: SomaflowTheme.lopCoral),
+            child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -332,79 +368,67 @@ class _HomeScreenState extends State<HomeScreen> {
     required String description,
     required IconData icon,
   }) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [backgroundGradientTop, backgroundGradientBottom],
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildTopAppBar(null),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 36,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF1E293B)
-                              .withValues(alpha: 0.08),
-                          blurRadius: 28,
-                          offset: const Offset(0, 12),
+    return SafeArea(
+      child: Column(
+        children: [
+          _buildTopAppBar(null),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+                  decoration: BoxDecoration(
+                    color: SomaflowTheme.cardFrosted,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: SomaflowTheme.borderLight),
+                    boxShadow: [
+                      BoxShadow(
+                        color: SomaflowTheme.sageDark.withValues(alpha: 0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          color: SomaflowTheme.sageWash,
+                          borderRadius: BorderRadius.circular(24),
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 76,
-                          height: 76,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F1F8),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: Icon(icon, size: 36, color: accentBlue),
+                        child: Icon(icon, size: 36, color: SomaflowTheme.sagePrimary),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: SomaflowTheme.textCharcoal,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
                         ),
-                        const SizedBox(height: 20),
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: primaryTextBlue,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        description,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: SomaflowTheme.textMuted,
+                          fontSize: 14,
+                          height: 1.5,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          description,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: secondaryTextBlue,
-                            fontSize: 14,
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -432,13 +456,17 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: primaryTextBlue,
-              borderRadius: BorderRadius.circular(14),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [SomaflowTheme.sagePrimary, SomaflowTheme.sageDeep],
+              ),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: primaryTextBlue.withValues(alpha: 0.12),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                  color: SomaflowTheme.sageDeep.withValues(alpha: 0.22),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -448,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 16.5,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -462,13 +490,21 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    const Text('Nandgate', style: HomeTheme.headerTitle),
+                    const Text(
+                      'Nandgate',
+                      style: TextStyle(
+                        color: SomaflowTheme.textCharcoal,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                     const SizedBox(width: 6),
                     Container(
                       width: 7,
                       height: 7,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF10B981),
+                        color: SomaflowTheme.statusGreen,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -476,41 +512,49 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Text(
                   employeeDetails.isEmpty
-                      ? 'Mindful Daily Dashboard'
+                      ? 'Mindful Presence & Focus'
                       : employeeDetails,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: HomeTheme.headerSubtitle,
+                  style: const TextStyle(
+                    color: SomaflowTheme.textMuted,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
           ),
           Container(
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.65),
+              color: Colors.white.withValues(alpha: 0.8),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.8),
-                width: 1,
-              ),
+              border: Border.all(color: SomaflowTheme.borderLight),
+              boxShadow: [
+                BoxShadow(
+                  color: SomaflowTheme.sageDark.withValues(alpha: 0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: const Icon(Icons.spa_outlined, size: 19, color: accentBlue),
+            child: const Icon(Icons.all_inclusive_rounded, size: 20, color: SomaflowTheme.sagePrimary),
           ),
           const SizedBox(width: 10),
           Stack(
             clipBehavior: Clip.none,
             children: [
               CircleAvatar(
-                radius: 18,
-                backgroundColor: accentBlue,
+                radius: 19,
+                backgroundColor: SomaflowTheme.sagePrimary,
                 child: Text(
                   initials.isEmpty ? 'E' : initials,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
@@ -518,12 +562,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 bottom: 0,
                 right: 0,
                 child: Container(
-                  width: 9,
-                  height: 9,
+                  width: 10,
+                  height: 10,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF94A3B8),
+                    color: SomaflowTheme.statusGreen,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
                 ),
               ),
@@ -538,7 +582,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(
               Icons.logout_rounded,
               size: 21,
-              color: secondaryTextBlue,
+              color: SomaflowTheme.textMuted,
             ),
           ),
         ],
@@ -546,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Greeting & Shift Tracker Hero Card ---
+  // --- Greeting & Shift Tracker Hero Card (Serene Sage Gradient) ---
   Widget _buildGreetingShiftCard(DashboardData? data) {
     final userName =
         data?.employee.name ??
@@ -565,101 +609,128 @@ class _HomeScreenState extends State<HomeScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [heroGradientStart, heroGradientEnd],
+          colors: [SomaflowTheme.sagePrimary, SomaflowTheme.sageDeep],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: heroGradientEnd.withValues(alpha: 0.3),
-            blurRadius: 20,
+            color: SomaflowTheme.sageDeep.withValues(alpha: 0.26),
+            blurRadius: 18,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _heroPill(icon: Icons.calendar_today_rounded, label: dateLabel),
-              _heroPill(
-                icon: Icons.circle,
-                label: 'STATUS: $status',
-                iconColor: status.toUpperCase() == 'IN'
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFF94A3B8),
+          // Gentle concentric watermark ripples
+          Positioned(
+            right: -25,
+            bottom: -25,
+            child: Opacity(
+              opacity: 0.12,
+              child: Container(
+                width: 160,
+                height: 160,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 22),
+                ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 16),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _heroPill(icon: Icons.calendar_today_rounded, label: dateLabel),
+                  _heroPill(
+                    icon: Icons.circle,
+                    label: 'STATUS: $status',
+                    iconColor: status.toUpperCase() == 'IN'
+                        ? const Color(0xFF6EE7B7)
+                        : Colors.white70,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Good ${_timeGreeting()}, $userName',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('🌿', style: TextStyle(fontSize: 18)),
+                ],
+              ),
+              const SizedBox(height: 4),
               Text(
-                'Good ${_timeGreeting()}, $userName',
-                style: HomeTheme.pageTitle.copyWith(
-                  color: Colors.white,
-                  letterSpacing: -0.3,
+                data?.today.punchInTime == null
+                    ? 'Breath cadence active. Settle focus for mindful presence.'
+                    : 'Your mindful shift is logged for today.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Colors.white.withValues(alpha: 0.88),
+                  height: 1.35,
                 ),
               ),
-              const SizedBox(width: 6),
-              const Text('👋', style: TextStyle(fontSize: 19)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            data?.today.punchInTime == null
-                ? 'Not punched in yet. Take a moment to prepare your day.'
-                : 'Your attendance is recorded for today.',
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: icyMutedBlue,
-              height: 1.35,
-            ),
-          ),
-          if (designation.isNotEmpty) ...[
-            const SizedBox(height: 3),
-            Text(
-              designation,
-              style: const TextStyle(color: lightMutedBlue, fontSize: 11),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: heroInnerCardBg.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: Row(
-              children: [
-                _buildShiftStatItem(
-                  'CHECK IN',
-                  _formatTime(context, data?.today.punchInTime),
-                  data?.today.punchInTime == null ? 'Not Started' : 'Today',
-                  Colors.white60,
-                ),
-                Container(width: 1, height: 44, color: Colors.white10),
-                _buildShiftStatItem(
-                  'WORKED',
-                  _formatDuration(todayWorkMinutes),
-                  todayWorkMinutes == null ? 'No data' : 'Today so far',
-                  lightMutedBlue,
-                ),
-                Container(width: 1, height: 44, color: Colors.white10),
-                _buildShiftStatItem(
-                  'LAST PUNCH',
-                  data?.today.lastPunch == null
-                      ? 'None'
-                      : _formatTime(context, data!.today.lastPunch),
-                  data?.today.lastPunch == null
-                      ? 'No punches today'
-                      : 'Latest activity',
-                  Colors.white60,
+              if (designation.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  designation,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 11,
+                  ),
                 ),
               ],
-            ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                ),
+                child: Row(
+                  children: [
+                    _buildShiftStatItem(
+                      'CHECK IN',
+                      _formatTime(context, data?.today.punchInTime),
+                      data?.today.punchInTime == null ? 'Not Started' : 'Today',
+                      Colors.white70,
+                    ),
+                    Container(width: 1, height: 44, color: Colors.white24),
+                    _buildShiftStatItem(
+                      'WORKED',
+                      _formatDuration(todayWorkMinutes),
+                      todayWorkMinutes == null ? 'No data' : 'Today so far',
+                      Colors.white,
+                    ),
+                    Container(width: 1, height: 44, color: Colors.white24),
+                    _buildShiftStatItem(
+                      'LAST PUNCH',
+                      data?.today.lastPunch == null
+                          ? 'None'
+                          : _formatTime(context, data!.today.lastPunch),
+                      data?.today.lastPunch == null
+                          ? 'No punches today'
+                          : 'Latest activity',
+                      Colors.white70,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -674,9 +745,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: Colors.white.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -688,7 +759,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: const TextStyle(
               fontSize: 10.5,
               color: Colors.white,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -734,11 +805,11 @@ class _HomeScreenState extends State<HomeScreen> {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9.5,
               letterSpacing: 0.5,
-              color: lightMutedBlue,
-              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 4),
@@ -746,7 +817,7 @@ class _HomeScreenState extends State<HomeScreen> {
             value,
             style: const TextStyle(
               fontSize: 14.5,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
               color: Colors.white,
             ),
           ),
@@ -764,70 +835,63 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Mood Check-In Card with Dynamic JSON Quotes & Lock Logic ---
+  // --- Mood Check-In Card / Somatic Cadence ---
   Widget _buildMoodCheckInCard() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardWhite,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderBlue),
-        boxShadow: [
-          BoxShadow(
-            color: primaryTextBlue.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- HEADER ---
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
+              Row(
+                children: const [
                   Icon(
-                    Icons.sentiment_satisfied_alt_rounded,
-                    color: primaryTextBlue,
-                    size: 19,
+                    Icons.self_improvement_rounded,
+                    color: SomaflowTheme.sagePrimary,
+                    size: 20,
                   ),
                   SizedBox(width: 8),
-                  Text('Daily Mood Check-In', style: HomeTheme.cardTitle),
+                  Text(
+                    'Somatic Cadence',
+                    style: TextStyle(
+                      color: SomaflowTheme.textCharcoal,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ],
               ),
-              // Show Reset button ONLY if session is locked
               if (_isSessionLocked)
                 GestureDetector(
                   onTap: _handleResetSession,
                   child: const Text(
                     'Reset',
                     style: TextStyle(
-                      fontSize: 11,
-                      color: accentBlue,
+                      fontSize: 11.5,
+                      color: SomaflowTheme.sagePrimary,
+                      fontWeight: FontWeight.bold,
                       decoration: TextDecoration.underline,
                     ),
                   ),
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: chipBlueBg,
-                    borderRadius: BorderRadius.circular(8),
+                    color: SomaflowTheme.sageWash,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: SomaflowTheme.borderLight),
                   ),
                   child: const Text(
-                    'MINDFUL PULSE',
+                    'BREATH CADENCE',
                     style: TextStyle(
-                      fontSize: 9.5,
-                      color: primaryTextBlue,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                      fontSize: 9,
+                      color: SomaflowTheme.sageDeep,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
                     ),
                   ),
                 ),
@@ -835,16 +899,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          // --- EMOJI PICKER (Only shows if NO rating is selected) ---
+          // Cadence Buttons
           if (!_isLoadingQuotes && _selectedMoodIndex == null) ...[
             const Center(
               child: Text(
-                'HOW IS YOUR DAY GOING?',
+                'HOW DOES YOUR BODY FEEL RIGHT NOW?',
                 style: TextStyle(
                   fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: lightMutedBlue,
-                  letterSpacing: 0.7,
+                  fontWeight: FontWeight.w800,
+                  color: SomaflowTheme.sageDeep,
+                  letterSpacing: 0.8,
                 ),
               ),
             ),
@@ -857,25 +921,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () => _handleRatingClick(index),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    width: 56,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    width: 58,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [heroGradientStart, heroGradientEnd],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
+                      color: selected ? SomaflowTheme.sagePrimary : SomaflowTheme.cardTinted,
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: selected
-                            ? const Color(0xFF97C1DE)
-                            : Colors.white.withValues(alpha: 0.18),
+                        color: selected ? SomaflowTheme.sageDeep : SomaflowTheme.borderLight,
                         width: selected ? 2 : 1,
                       ),
                       boxShadow: [
                         if (selected)
                           BoxShadow(
-                            color: primaryTextBlue.withValues(alpha: 0.2),
+                            color: SomaflowTheme.sageDeep.withValues(alpha: 0.25),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -894,12 +952,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 9.5,
-                            fontWeight: selected
-                                ? FontWeight.w800
-                                : FontWeight.w600,
-                            color: selected
-                                ? Colors.white
-                                : const Color(0xFFDCE8F3),
+                            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                            color: selected ? Colors.white : SomaflowTheme.sageDeep,
                           ),
                         ),
                       ],
@@ -910,18 +964,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
 
-          // --- QUOTE DISPLAY (Only shows if a quote is locked in) ---
+          // Quote Card Display (Serif Zen Style from Somaflow)
           if (_currentQuote != null)
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: Container(
-                key: ValueKey(
-                  _currentQuote!.id,
-                ), // Triggers animation on change
+                key: ValueKey(_currentQuote!.id),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF3FB),
-                  borderRadius: BorderRadius.circular(12),
+                  color: SomaflowTheme.cardTinted,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: SomaflowTheme.borderLight),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -931,9 +984,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
-                        color: primaryTextBlue,
-                        height: 1.4,
-                        fontWeight: FontWeight.w500,
+                        color: SomaflowTheme.textCharcoal,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -942,8 +995,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       textAlign: TextAlign.right,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: secondaryTextBlue,
-                        fontWeight: FontWeight.w600,
+                        color: SomaflowTheme.sageDeep,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -951,27 +1004,25 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-          // --- FALLBACK TEXT (Shows if data is loaded but no mood picked) ---
           if (!_isLoadingQuotes && _selectedMoodIndex == null) ...[
             const SizedBox(height: 12),
             const Center(
               child: Text(
-                'Take a moment to check in with yourself.',
+                'Take a deep 6s breath to settle your attention.',
                 style: TextStyle(
                   fontSize: 11.5,
-                  color: primaryTextBlue,
+                  color: SomaflowTheme.textMuted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ],
 
-          // --- LOADING STATE ---
           if (_isLoadingQuotes)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(color: SomaflowTheme.sagePrimary, strokeWidth: 2),
               ),
             ),
         ],
@@ -979,7 +1030,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Monthly Snapshot 2x2 Grid ---
+  // --- Monthly Snapshot 2x2 Grid (Somaflow Frosted Style) ---
   Widget _buildMonthlySnapshotSection(DashboardData? data) {
     final monthLabel = data == null || data.month < 1 || data.year < 1
         ? 'This month'
@@ -1005,13 +1056,20 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Monthly Snapshot', style: HomeTheme.sectionTitle),
+              const Text(
+                'Monthly Cadence',
+                style: TextStyle(
+                  color: SomaflowTheme.textCharcoal,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               Text(
                 monthLabel,
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: secondaryTextBlue,
+                  color: SomaflowTheme.textMuted,
                 ),
               ),
             ],
@@ -1023,15 +1081,17 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSpacing: 12,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.36,
+          childAspectRatio: 1.34,
           children: [
             _buildSnapshotCard(
               label: 'ATTENDANCE',
               value: data == null ? '—' : '$presentDays / $totalDays Days',
               badgeText: data == null ? 'Loading' : '$presentDays Present',
               footer: data == null
-                  ? 'Monthly attendance'
-                  : '$presentDays present · $workHours worked',
+                  ? 'Cadence overview'
+                  : '$presentDays present · $workHours',
+              badgeColor: SomaflowTheme.statusGreenBg,
+              badgeTextColor: SomaflowTheme.statusGreen,
               footerIcon: data == null ? null : Icons.circle,
             ),
             _buildSnapshotCard(
@@ -1039,6 +1099,8 @@ class _HomeScreenState extends State<HomeScreen> {
               value: data == null ? '—' : '${data.lopDays} Days',
               badgeText: data == null ? 'Loading' : 'Recorded',
               footer: '$monthLabel LOP',
+              badgeColor: SomaflowTheme.lopCoralBg,
+              badgeTextColor: SomaflowTheme.lopCoral,
             ),
             _buildSnapshotCard(
               label: 'LEAVE BALANCE',
@@ -1051,6 +1113,8 @@ class _HomeScreenState extends State<HomeScreen> {
               footer: data == null
                   ? 'Available leave'
                   : '${data.leaveBalance.pendingDays} pending approval',
+              badgeColor: SomaflowTheme.sageWash,
+              badgeTextColor: SomaflowTheme.sageDeep,
             ),
             _buildSnapshotCard(
               label: 'NEXT HOLIDAY',
@@ -1059,6 +1123,8 @@ class _HomeScreenState extends State<HomeScreen> {
               footer: nextHoliday == null
                   ? 'No upcoming holiday'
                   : 'Upcoming holiday',
+              badgeColor: SomaflowTheme.holidayGoldBg,
+              badgeTextColor: SomaflowTheme.holidayGold,
             ),
           ],
         ),
@@ -1082,26 +1148,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required String value,
     required String badgeText,
     required String footer,
+    required Color badgeColor,
+    required Color badgeTextColor,
     IconData? footerIcon,
   }) {
     return Container(
       padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [heroGradientStart, heroGradientEnd],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: primaryTextBlue.withValues(alpha: 0.16),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1116,31 +1169,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: 0.6,
-                    color: icyMutedBlue,
+                    color: SomaflowTheme.sageDeep,
                   ),
                 ),
               ),
               const SizedBox(width: 4),
               Container(
-                constraints: const BoxConstraints(maxWidth: 88),
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                constraints: const BoxConstraints(maxWidth: 90),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15),
-                  ),
+                  color: badgeColor,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   badgeText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFDCE8F3),
+                    fontWeight: FontWeight.w800,
+                    color: badgeTextColor,
                   ),
                 ),
               ),
@@ -1150,12 +1200,16 @@ class _HomeScreenState extends State<HomeScreen> {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: HomeTheme.metric.copyWith(color: Colors.white),
+            style: const TextStyle(
+              color: SomaflowTheme.textCharcoal,
+              fontSize: 16.5,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           Row(
             children: [
               if (footerIcon != null) ...[
-                const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
+                const Icon(Icons.circle, size: 6, color: SomaflowTheme.statusGreen),
                 const SizedBox(width: 5),
               ],
               Expanded(
@@ -1165,8 +1219,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 9.5,
-                    color: icyMutedBlue,
-                    fontWeight: FontWeight.w500,
+                    color: SomaflowTheme.textMuted,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1177,6 +1231,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // --- Upcoming Announcements ---
   Widget _buildUpcomingEvents(DashboardData data) {
     final today = DateTime.tryParse(data.today.date);
     final events = data.events.where((event) {
@@ -1194,13 +1249,20 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.only(left: 4, bottom: 10),
             child: Row(
               children: [
-                const Text('Announcements', style: HomeTheme.sectionTitle),
+                const Text(
+                  'Mindful Circles & News',
+                  style: TextStyle(
+                    color: SomaflowTheme.textCharcoal,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(width: 6),
                 Container(
                   width: 7,
                   height: 7,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF10B981),
+                    color: SomaflowTheme.sagePrimary,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1210,7 +1272,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: secondaryTextBlue,
+                    color: SomaflowTheme.textMuted,
                   ),
                 ),
               ],
@@ -1227,30 +1289,19 @@ class _HomeScreenState extends State<HomeScreen> {
             return Container(
               margin: const EdgeInsets.only(bottom: 9),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: cardWhite,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: borderBlue),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryTextBlue.withValues(alpha: 0.03),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+              decoration: _cardDecoration(),
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      color: chipBlueBg,
-                      borderRadius: BorderRadius.circular(10),
+                      color: SomaflowTheme.sageWash,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(icon, size: 18, color: accentBlue),
+                    child: Icon(icon, size: 19, color: SomaflowTheme.sagePrimary),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1260,17 +1311,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: primaryTextBlue,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
+                            color: SomaflowTheme.textCharcoal,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           event.type.replaceAll('_', ' '),
                           style: const TextStyle(
-                            color: secondaryTextBlue,
-                            fontSize: 10,
+                            color: SomaflowTheme.textMuted,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
@@ -1279,9 +1331,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     dateLabel,
                     style: const TextStyle(
-                      color: secondaryTextBlue,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
+                      color: SomaflowTheme.sageDeep,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -1293,33 +1345,31 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Quick Mindful Action Banner ---
+  // --- Quick Mindful Action Banner (Somaflow Pill Style) ---
   Widget _buildQuickActionBanner() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderBlue),
-        boxShadow: [
-          BoxShadow(
-            color: primaryTextBlue.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: primaryTextBlue,
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [SomaflowTheme.sagePrimary, SomaflowTheme.sageDeep],
+              ),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: SomaflowTheme.sageDeep.withValues(alpha: 0.22),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: const Icon(
-              Icons.self_improvement_rounded,
+              Icons.spa_rounded,
               color: Colors.white,
               size: 20,
             ),
@@ -1330,17 +1380,17 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Take a 2-Min Mindful Breath',
+                  'Morning Renewal Flow',
                   style: TextStyle(
-                    color: primaryTextBlue,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    color: SomaflowTheme.textCharcoal,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Settle focus before your next sprint',
-                  style: TextStyle(color: secondaryTextBlue, fontSize: 11),
+                  '6s Inhale · Somatic Pacing · 12 mins',
+                  style: TextStyle(color: SomaflowTheme.textMuted, fontSize: 11),
                 ),
               ],
             ),
@@ -1348,12 +1398,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ElevatedButton(
             onPressed: () {},
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryTextBlue,
+              backgroundColor: SomaflowTheme.sagePrimary,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(14),
               ),
               minimumSize: const Size(60, 36),
             ),
@@ -1367,6 +1417,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // --- Frosted Card Decoration Helper ---
+  BoxDecoration _cardDecoration() => BoxDecoration(
+        color: SomaflowTheme.cardFrosted,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: SomaflowTheme.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
+
   // --- Floating Bottom Navigation Bar ---
   Widget _buildBottomNav() {
     return ModernCurvedBottomNavBar(
@@ -1375,4 +1439,36 @@ class _HomeScreenState extends State<HomeScreen> {
       items: employeeBottomNavItems,
     );
   }
+}
+
+// --- Somaflow Organic Ripples Painter ---
+class _SomaflowBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Top sage-green organic canopy
+    final paintSage = Paint()
+      ..color = SomaflowTheme.sageMuted.withValues(alpha: 0.18)
+      ..style = PaintingStyle.fill;
+
+    final path1 = Path()
+      ..moveTo(0, 0)
+      ..cubicTo(size.width * 0.45, 0, size.width * 0.55, size.height * 0.18, 0, size.height * 0.28)
+      ..close();
+    canvas.drawPath(path1, paintSage);
+
+    // Warm sand side wave
+    final paintSand = Paint()
+      ..color = SomaflowTheme.warmSand.withValues(alpha: 0.16)
+      ..style = PaintingStyle.fill;
+
+    final path2 = Path()
+      ..moveTo(size.width * 0.5, 0)
+      ..cubicTo(size.width * 0.75, size.height * 0.08, size.width, size.height * 0.04, size.width, size.height * 0.20)
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(path2, paintSand);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

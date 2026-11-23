@@ -1,6 +1,20 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/app_theme.dart';
+/// Somaflow Sage Green & Warm Parchment Navigation Tokens
+class SomaflowNavTheme {
+  // Active elevated pill & icon
+  static const Color activeIndicator = Color(0xFF51644F); // Deep Forest Sage
+  static const Color activeIcon = Colors.white;
+  static const Color activeBorder = Color(0xFFFCFAF7);
+
+  // Bar container surface & border
+  static const Color barBackground = Color(0xF8FCFAF7); // Frosted Oatmeal
+  static const Color barBorder = Color(0xFFD6DDD4); // Soft Herbal Ring
+  static const Color barShadow = Color(0xFF384736); // Subtle Sage Ambient Shadow
+
+  // Inactive icons
+  static const Color inactiveIcon = Color(0xFF7C8D7A); // Muted Herbal Sage
+}
 
 class BottomNavItem {
   const BottomNavItem({
@@ -83,13 +97,12 @@ class _ModernCurvedBottomNavBarState extends State<ModernCurvedBottomNavBar>
     if (oldWidget.currentIndex == widget.currentIndex) return;
 
     final currentPosition = _selectedPosition.value;
-    _selectedPosition =
-        Tween<double>(
-          begin: currentPosition,
-          end: widget.currentIndex.toDouble(),
-        ).animate(
-          CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
-        );
+    _selectedPosition = Tween<double>(
+      begin: currentPosition,
+      end: widget.currentIndex.toDouble(),
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+    );
     _controller.forward(from: 0);
   }
 
@@ -103,11 +116,11 @@ class _ModernCurvedBottomNavBarState extends State<ModernCurvedBottomNavBar>
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 14),
       child: LayoutBuilder(
         builder: (context, constraints) {
           const indicatorSize = 56.0;
-          const barHeight = 56.0;
+          const barHeight = 58.0;
           final itemWidth = constraints.maxWidth / widget.items.length;
 
           return AnimatedBuilder(
@@ -117,14 +130,15 @@ class _ModernCurvedBottomNavBarState extends State<ModernCurvedBottomNavBar>
                   itemWidth * (_selectedPosition.value + 0.5);
 
               return SizedBox(
-                height: 76,
+                height: 78,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
+                    // --- Curved Notched Background Bar ---
                     Positioned(
                       left: 0,
                       right: 0,
-                      top: 20,
+                      top: 18,
                       child: SizedBox(
                         height: barHeight,
                         child: CustomPaint(
@@ -134,10 +148,12 @@ class _ModernCurvedBottomNavBarState extends State<ModernCurvedBottomNavBar>
                         ),
                       ),
                     ),
+
+                    // --- Unselected Navigation Icons ---
                     Positioned(
                       left: 0,
                       right: 0,
-                      top: 20,
+                      top: 18,
                       bottom: 0,
                       child: Row(
                         children: List.generate(widget.items.length, (index) {
@@ -151,6 +167,8 @@ class _ModernCurvedBottomNavBarState extends State<ModernCurvedBottomNavBar>
                         }),
                       ),
                     ),
+
+                    // --- Elevated Active Indicator with Notch Fit ---
                     Positioned(
                       left: indicatorCenter - indicatorSize / 2,
                       top: 0,
@@ -159,13 +177,23 @@ class _ModernCurvedBottomNavBarState extends State<ModernCurvedBottomNavBar>
                           width: indicatorSize,
                           height: indicatorSize,
                           decoration: BoxDecoration(
-                            color: HomeTheme.heroGradientEnd,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF6B8268), // Sage Primary
+                                Color(0xFF51644F), // Deep Forest Sage
+                              ],
+                            ),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 4),
+                            border: Border.all(
+                              color: SomaflowNavTheme.activeBorder,
+                              width: 3.5,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: HomeTheme.heroGradientEnd.withValues(
-                                  alpha: 0.24,
+                                color: SomaflowNavTheme.barShadow.withValues(
+                                  alpha: 0.22,
                                 ),
                                 blurRadius: 12,
                                 offset: const Offset(0, 5),
@@ -174,7 +202,7 @@ class _ModernCurvedBottomNavBarState extends State<ModernCurvedBottomNavBar>
                           ),
                           child: Icon(
                             widget.items[widget.currentIndex].activeIcon,
-                            color: Colors.white,
+                            color: SomaflowNavTheme.activeIcon,
                             size: 23,
                           ),
                         ),
@@ -218,14 +246,29 @@ class _NotchedNavBarPainter extends CustomPainter {
       );
     final shape = Path.combine(PathOperation.difference, bar, notch);
 
-    canvas.drawShadow(shape, HomeTheme.heroGradientEnd, 10, true);
-    canvas.drawPath(shape, Paint()..color = Colors.white);
+    // Soft organic sage shadow
+    canvas.drawShadow(
+      shape,
+      SomaflowNavTheme.barShadow.withValues(alpha: 0.45),
+      8,
+      true,
+    );
+
+    // Frosted parchment fill
     canvas.drawPath(
       shape,
       Paint()
-        ..color = HomeTheme.borderBlue
+        ..color = SomaflowNavTheme.barBackground
+        ..style = PaintingStyle.fill,
+    );
+
+    // Subtle herbal outline stroke
+    canvas.drawPath(
+      shape,
+      Paint()
+        ..color = SomaflowNavTheme.barBorder
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
+        ..strokeWidth = 1.0,
     );
   }
 
@@ -260,7 +303,11 @@ class _BottomNavItem extends StatelessWidget {
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 160),
               opacity: isSelected ? 0 : 1,
-              child: Icon(item.icon, size: 21, color: const Color(0xFF7A94AF)),
+              child: Icon(
+                item.icon,
+                size: 21,
+                color: SomaflowNavTheme.inactiveIcon,
+              ),
             ),
           ),
         ),

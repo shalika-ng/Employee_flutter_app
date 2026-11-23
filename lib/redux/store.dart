@@ -4,6 +4,9 @@ import '../features/attendance/redux/attendance_middleware.dart';
 import '../features/attendance/redux/attendance_reducer.dart';
 import '../features/auth/redux/auth_middleware.dart';
 import '../features/auth/redux/auth_reducer.dart';
+import '../features/requests/redux/request_middleware.dart';
+import '../features/requests/redux/request_reducer.dart';
+import '../features/requests/services/request_service.dart';
 import 'app_state.dart';
 
 /// App-wide root reducer: delegates each slice of [AppState] to its own
@@ -12,6 +15,7 @@ AppState appReducer(AppState state, dynamic action) {
   return state.copyWith(
     auth: authReducer(state.auth, action),
     attendance: attendanceReducer(state.attendance, action),
+    request: requestReducer(state.request, action),
   );
 }
 
@@ -24,6 +28,7 @@ Store<AppState> createStore() {
     middleware: [
       ...createAuthMiddleware<AppState>(),
       ...createAttendanceMiddleware<AppState>(),
+      ...createRequestMiddleware(RequestService()),
     ],
   );
 }
