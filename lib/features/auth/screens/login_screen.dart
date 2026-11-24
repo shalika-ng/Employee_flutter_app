@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 
 
@@ -193,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
                        'assets/images/logo.png',
                        height: h * 0.20,
                        fit: BoxFit.contain,
-                       errorBuilder: (_, __, ___) => SizedBox(
+                       errorBuilder: (_, _, _) => SizedBox(
                          height: h * 0.20,
                          child: const Center(
                            child: Text(

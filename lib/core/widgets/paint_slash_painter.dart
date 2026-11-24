@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Textured paint-brushstroke divider used at the bottom of the login
 /// screen, separating the brand-colored header from the white footer.

@@ -2,7 +2,7 @@
 // is hidden until an emoji is tapped, and that tapping a different mood
 // swaps in that mood's quote.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:redux/redux.dart';

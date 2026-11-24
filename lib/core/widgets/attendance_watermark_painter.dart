@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Decorative background watermarks (clock dial, calendar check, flight arc)
 /// used behind the dashboard content. Pure painting, no state.

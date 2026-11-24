@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +13,7 @@ import '../../attendance/screens/attendance_screen.dart';
 import '../../auth/redux/auth_actions.dart';
 import '../models/dashboard_model.dart';
 import '../services/dashboard_service.dart';
+import '../../requests/screens/request_screen.dart';
 
 /// Exact Somaflow Sage Green & Warm Parchment Tokens
 class SomaflowTheme {
@@ -222,46 +223,58 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SomaflowTheme.backgroundBottom,
-      body: Stack(
-        children: [
-          // Somaflow Ambient Waves Backdrop
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _SomaflowBackgroundPainter(),
+
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: SomaflowTheme.backgroundBottom,
+    body: Stack(
+      children: [
+        // Somaflow Ambient Waves Backdrop
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _SomaflowBackgroundPainter(),
+          ),
+        ),
+
+        IndexedStack(
+          index: _currentBottomNavIndex,
+          children: [
+            // 0. Dashboard
+            _buildDashboardPage(),
+
+            // 1. Attendance
+            _hasOpenedAttendance
+                ? AttendanceScreen(
+                    onNavigate: _navigateFromNestedPage,
+                  )
+                : const SizedBox.shrink(),
+
+            // 2. Requests
+            const RequestsScreen(),
+
+            // 3. Calendar
+            _buildSectionPage(
+              title: 'Calendar',
+              description:
+                  'Your shifts and important dates will appear here.',
+              icon: Icons.calendar_month_rounded,
             ),
-          ),
-          IndexedStack(
-            index: _currentBottomNavIndex,
-            children: [
-              _buildDashboardPage(),
-              _hasOpenedAttendance
-                  ? AttendanceScreen(onNavigate: _navigateFromNestedPage)
-                  : const SizedBox.shrink(),
-              _buildSectionPage(
-                title: 'Requests',
-                description: 'Your leave and other requests will appear here.',
-                icon: Icons.assignment_outlined,
-              ),
-              _buildSectionPage(
-                title: 'Calendar',
-                description: 'Your shifts and important dates will appear here.',
-                icon: Icons.calendar_month_rounded,
-              ),
-              _buildSectionPage(
-                title: 'Payslip',
-                description: 'Your payslips will appear here.',
-                icon: Icons.account_balance_wallet_outlined,
-              ),
-            ],
-          ),
-        ],
-      ),
-      bottomNavigationBar: _buildBottomNav(),
-    );
+
+            // 4. Payslip
+            _buildSectionPage(
+              title: 'Payslip',
+              description: 'Your payslips will appear here.',
+              icon: Icons.account_balance_wallet_outlined,
+            ),
+          ],
+        ),
+      ],
+    ),
+
+    // Bottom Navigation
+    bottomNavigationBar: _buildBottomNav(),
+  );
   }
 
   void _selectNavigationItem(int index) {

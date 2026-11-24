@@ -3,7 +3,7 @@
 // dispatching, and that a failed login surfaces the Redux error message
 // via a SnackBar as well.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:redux/redux.dart';
