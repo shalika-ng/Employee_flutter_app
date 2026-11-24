@@ -1,530 +1,411 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 
-
 import '../../../core/utils/validators.dart';
 import '../../../redux/app_state.dart';
 import '../redux/auth_actions.dart';
 import '../redux/auth_state.dart';
 
-
-/// ---------- COLOURS (taken from your design) ----------
 class AppColors {
- static const navy = Color(0xFF1B2A41); // text, icons, button
- static const buttonDark = Color(0xFF1E293B); // arrow button
- static const accent = Color(0xFF1F5A7A); // decorative line icons
- static const hint = Color(0xFF6B7280); // hint text
- static const bgTop = Color(0xFFE6F0F9);
- static const bgBottom = Color(0xFF9DC3E0);
- static const gridLine = Color(0xFF4A6785);
+  static const primaryBackground = Color(0xFFA5B8A4);
+  static const cardBackground = Colors.white;
+  static const darkText = Color(0xFF1E281D);
+  static const bodyMutedText = Color(0xFF556553);
+  static const inputFieldBg = Color(0xFFEBF1EA);
+  static const inputBorderColor = Color(0xFFDCE5DA);
+  static const inputLabelColor = Color(0xFF263324);
+  static const placeholderText = Color(0xFF7E8F7C);
+  static const ctaButtonBg = Color(0xFF213B26);
 }
-
 
 class LoginScreen extends StatefulWidget {
- const LoginScreen({super.key});
+  const LoginScreen({super.key});
 
-
- @override
- State<LoginScreen> createState() => _LoginScreenState();
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
 }
-
 
 class _LoginScreenState extends State<LoginScreen> {
- // Controllers
- final _subIdController = TextEditingController();
- final _usernameController = TextEditingController();
- final _passwordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
+  bool _isPasswordVisible = false;
+  bool _agreedToTerms = true;
 
- // State
- bool _isPasswordVisible = false;
- bool _agreedToTerms = true;
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
+  void _submit(BuildContext context) {
+    if (StoreProvider.of<AppState>(context).state.auth.status ==
+        AuthStatus.loading) {
+      return;
+    }
 
- @override
- void dispose() {
-   _subIdController.dispose();
-   _usernameController.dispose();
-   _passwordController.dispose();
-   super.dispose();
- }
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
 
+    final usernameError = Validators.email(username);
+    final passwordError = Validators.password(password);
+    if (usernameError != null || passwordError != null) {
+      _showSnack(context, usernameError ?? passwordError!);
+      return;
+    }
 
- void _submit(BuildContext context) {
-   final subId = _subIdController.text.trim();
-   final username = _usernameController.text.trim();
-   final password = _passwordController.text;
+    if (!_agreedToTerms) {
+      _showSnack(context, 'Please agree to the Terms & Conditions');
+      return;
+    }
 
+    StoreProvider.of<AppState>(context)
+        .dispatch(LoginSubmitAction(email: username, password: password));
+  }
 
-   // Basic validation
-   if (subId.isEmpty) {
-     _showSnack(context, 'Please enter Sub ID / Workspace');
-     return;
-   }
+  void _showSnack(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.ctaButtonBg,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.primaryBackground,
+      body: SafeArea(
+        child: StoreConnector<AppState, AuthState>(
+          converter: (store) => store.state.auth,
+          onWillChange: (previous, current) {
+            if (current.status == AuthStatus.failure &&
+                current.errorMessage != null &&
+                current.errorMessage != previous?.errorMessage) {
+              _showSnack(context, current.errorMessage!);
+            }
+          },
+          builder: (context, authState) {
+            final isLoading = authState.status == AuthStatus.loading;
 
-   final usernameError = Validators.email(username);
-   final passwordError = Validators.password(password);
+            return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 28),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            width: 88,
+                            height: 88,
+                            fit: BoxFit.cover,
+                            semanticLabel: 'Nandgate logo',
+                          ),
+                        ),
+                        const SizedBox(height: 36),
+                        const Text(
+                          'Your\nattendance.\nAll in one place.',
+                          style: TextStyle(
+                            fontSize: 38,
+                            fontWeight: FontWeight.w800,
+                            height: 1.12,
+                            letterSpacing: -1,
+                            color: AppColors.darkText,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Sign in to view your attendance and\nrecords.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                            color: AppColors.bodyMutedText,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 28,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(32),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF1E2F20)
+                                    .withValues(alpha: 0.12),
+                                blurRadius: 28,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Sign in',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.darkText,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Use your organization account.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.bodyMutedText,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              _fieldLabel('Email address'),
+                              const SizedBox(height: 8),
+                              _inputField(
+                                controller: _usernameController,
+                                hint: 'name@organization.com',
+                                icon: Icons.email_outlined,
+                                enabled: !isLoading,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                              ),
+                              const SizedBox(height: 20),
+                              _fieldLabel('Password'),
+                              const SizedBox(height: 8),
+                              _inputField(
+                                controller: _passwordController,
+                                hint: 'Enter your password',
+                                icon: Icons.lock_outline,
+                                obscure: !_isPasswordVisible,
+                                enabled: !isLoading,
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: () => _submit(context),
+                                suffix: IconButton(
+                                  tooltip: _isPasswordVisible
+                                      ? 'Hide password'
+                                      : 'Show password',
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => setState(() {
+                                          _isPasswordVisible =
+                                              !_isPasswordVisible;
+                                        }),
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: AppColors.bodyMutedText,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Row(
+                                children: [
+                                  Checkbox(
+                                    value: _agreedToTerms,
+                                    activeColor: AppColors.ctaButtonBg,
+                                    checkColor: Colors.white,
+                                    side: const BorderSide(
+                                      color: AppColors.bodyMutedText,
+                                    ),
+                                    onChanged: isLoading
+                                        ? null
+                                        : (value) => setState(() {
+                                            _agreedToTerms = value ?? false;
+                                          }),
+                                  ),
+                                  const Expanded(
+                                    child: Text(
+                                      'I agree with Terms & Conditions',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        color: AppColors.bodyMutedText,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 54,
+                                child: ElevatedButton(
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => _submit(context),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.ctaButtonBg,
+                                    disabledBackgroundColor: AppColors
+                                        .ctaButtonBg
+                                        .withValues(alpha: 0.6),
+                                    elevation: 4,
+                                    shadowColor: AppColors.ctaButtonBg
+                                        .withValues(alpha: 0.35),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: isLoading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'Sign in to portal',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 15.5,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Icon(
+                                                Icons.arrow_forward,
+                                                size: 18,
+                                                color: Colors.white,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 22),
+                              const Center(
+                                child: Text.rich(
+                                  TextSpan(
+                                    text: 'Need access? ',
+                                    children: [
+                                      TextSpan(
+                                        text: 'Contact administrator',
+                                        style: TextStyle(
+                                          color: AppColors.darkText,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.bodyMutedText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Center(
+                          child: Text(
+                            'By continuing, you agree to our\n'
+                            'Terms of Service  ·  Privacy Policy',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.bodyMutedText,
+                              fontWeight: FontWeight.w500,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
+  Widget _fieldLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: AppColors.inputLabelColor,
+      ),
+    );
+  }
 
-   if (usernameError != null || passwordError != null) {
-     _showSnack(context, usernameError ?? passwordError!);
-     return;
-   }
+  Widget _inputField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+    bool enabled = true,
+    Widget? suffix,
+    TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    VoidCallback? onSubmitted,
+  }) {
+    OutlineInputBorder border(Color color, {double width = 1}) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: color, width: width),
+        );
 
-
-   if (!_agreedToTerms) {
-     _showSnack(context, 'Please agree to the Terms & Conditions');
-     return;
-   }
-
-
-   // Dispatch to Redux
-   StoreProvider.of<AppState>(context).dispatch(
-     LoginSubmitAction(
-       email: username,
-       password: password,
-     ),
-   );
- }
-
-
- void _showSnack(BuildContext context, String message) {
-   ScaffoldMessenger.of(context).showSnackBar(
-     SnackBar(
-       content: Text(message),
-       backgroundColor: AppColors.navy,
-       behavior: SnackBarBehavior.floating,
-       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-     ),
-   );
- }
-
-
- @override
- Widget build(BuildContext context) {
-   return Scaffold(
-     resizeToAvoidBottomInset: false,
-     backgroundColor: Colors.white,
-     body: StoreConnector<AppState, AuthState>(
-       converter: (store) => store.state.auth,
-       onWillChange: (previous, current) {
-         if (current.status == AuthStatus.failure &&
-             current.errorMessage != null &&
-             current.errorMessage != previous?.errorMessage) {
-           _showSnack(context, current.errorMessage!);
-         }
-       },
-       builder: (context, authState) {
-         final isLoading = authState.status == AuthStatus.loading;
-
-
-         return LayoutBuilder(
-           builder: (context, c) {
-             final w = c.maxWidth;
-             final h = c.maxHeight;
-             // Adjusted wave slightly lower to make room for the lower form
-             final waveTop = h * 0.73;
-
-
-             return Stack(
-               children: [
-                 // 1. Blue gradient background
-                 Positioned.fill(
-                   child: Container(
-                     decoration: const BoxDecoration(
-                       gradient: LinearGradient(
-                         begin: Alignment.topCenter,
-                         end: Alignment.bottomCenter,
-                         colors: [AppColors.bgTop, AppColors.bgBottom],
-                       ),
-                     ),
-                   ),
-                 ),
-
-
-                 // 2. Dashed grid
-                 Positioned.fill(
-                   child: CustomPaint(painter: _GridPainter()),
-                 ),
-
-
-                 // 3. Decorative line icons (half cut off at screen edges)
-                 Positioned(
-                   left: -28,
-                   top: h * 0.20,
-                   child: _deco(Icons.event_available_outlined, 110),
-                 ),
-                 Positioned(
-                   right: -40,
-                   top: h * 0.03,
-                   child: _deco(Icons.schedule_outlined, 150),
-                 ),
-                 Positioned(
-                   left: -8,
-                   top: h * 0.54,
-                   child: _deco(Icons.badge_outlined, 110),
-                 ),
-                 Positioned(
-                   right: -6,
-                   top: h * 0.57,
-                   child: _deco(Icons.phone_android_outlined, 100),
-                 ),
-
-
-                 // 4. White wave at the bottom
-                 Positioned.fill(
-                   child: CustomPaint(painter: _WavePainter(waveTop: waveTop)),
-                 ),
-
-
-                 // 5. Logo card
-                 Positioned(
-                   top: h * 0.16,
-                   left: w * 0.18,
-                   right: w * 0.12,
-                   child: Container(
-                     padding: const EdgeInsets.symmetric(vertical: 8),
-                     decoration: BoxDecoration(
-                       color: Colors.white.withValues(alpha: 0.55),
-                       borderRadius: BorderRadius.circular(4),
-                     ),
-                     child: Image.asset(
-                       'assets/images/logo.png',
-                       height: h * 0.20,
-                       fit: BoxFit.contain,
-                       errorBuilder: (_, _, _) => SizedBox(
-                         height: h * 0.20,
-                         child: const Center(
-                           child: Text(
-                             'NANDGATE',
-                             style: TextStyle(
-                               fontSize: 28,
-                               letterSpacing: 4,
-                               fontWeight: FontWeight.w700,
-                               color: AppColors.navy,
-                             ),
-                           ),
-                         ),
-                       ),
-                     ),
-                   ),
-                 ),
-
-
-                 // 6. Input fields
-                 Positioned(
-                   top: h * 0.43,
-                   left: w * 0.11,
-                   right: w * 0.11,
-                   child: Column(
-                     children: [
-                       _pillField(
-                         controller: _subIdController,
-                         hint: 'Sub ID / Workspace Name',
-                         icon: Icons.work_outline,
-                         enabled: !isLoading,
-                         textInputAction: TextInputAction.next,
-                       ),
-                       const SizedBox(height: 16),
-                       _pillField(
-                         controller: _usernameController,
-                         hint: 'Username / Email',
-                         icon: Icons.person_outline,
-                         enabled: !isLoading,
-                         keyboardType: TextInputType.emailAddress,
-                         textInputAction: TextInputAction.next,
-                       ),
-                       const SizedBox(height: 16),
-                       _pillField(
-                         controller: _passwordController,
-                         hint: 'Password',
-                         icon: Icons.lock_outline,
-                         obscure: !_isPasswordVisible,
-                         enabled: !isLoading,
-                         textInputAction: TextInputAction.done,
-                         onSubmitted: () => _submit(context),
-                         suffix: IconButton(
-                           icon: Icon(
-                             _isPasswordVisible
-                                 ? Icons.visibility_outlined
-                                 : Icons.visibility_off_outlined,
-                             color: Colors.grey.shade500,
-                             size: 22,
-                           ),
-                           onPressed: isLoading
-                               ? null
-                               : () => setState(() => _isPasswordVisible =
-                                   !_isPasswordVisible),
-                         ),
-                       ),
-                     ],
-                   ),
-                 ),
-
-
-                 // 7. Round arrow button
-                 Positioned(
-                   top: h * 0.68,
-                   left: 0,
-                   right: 0,
-                   child: Center(
-                     child: GestureDetector(
-                       onTap: isLoading ? null : () => _submit(context),
-                       child: AnimatedContainer(
-                         duration: const Duration(milliseconds: 200),
-                         width: 60,
-                         height: 60,
-                         decoration: BoxDecoration(
-                           color: AppColors.buttonDark,
-                           shape: BoxShape.circle,
-                           boxShadow: [
-                             BoxShadow(
-                               color: Colors.black.withValues(alpha: 0.25),
-                               blurRadius: 12,
-                               offset: const Offset(0, 5),
-                             ),
-                           ],
-                         ),
-                         child: Center(
-                           child: isLoading
-                               ? const SizedBox(
-                                   width: 24,
-                                   height: 24,
-                                   child: CircularProgressIndicator(
-                                     strokeWidth: 2.5,
-                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                         Colors.white),
-                                   ),
-                                 )
-                               : const Icon(
-                                   Icons.arrow_forward,
-                                   color: Colors.white,
-                                   size: 26,
-                                 ),
-                         ),
-                       ),
-                     ),
-                   ),
-                 ),
-
-
-                 // 8. Terms & footer
-                 Positioned(
-                   bottom: h * 0.10,
-                   left: 0,
-                   right: 0,
-                   child: Column(
-                     children: [
-                       Row(
-                         mainAxisAlignment: MainAxisAlignment.center,
-                         children: [
-                           GestureDetector(
-                             onTap: isLoading
-                                 ? null
-                                 : () => setState(
-                                     () => _agreedToTerms = !_agreedToTerms),
-                             child: Container(
-                               width: 20,
-                               height: 20,
-                               decoration: BoxDecoration(
-                                 color: _agreedToTerms
-                                     ? AppColors.navy
-                                     : Colors.white,
-                                 borderRadius: BorderRadius.circular(4),
-                                 border: Border.all(
-                                     color: AppColors.navy, width: 1.5),
-                               ),
-                               child: _agreedToTerms
-                                   ? const Icon(Icons.check,
-                                       size: 15, color: Colors.white)
-                                   : null,
-                             ),
-                           ),
-                           const SizedBox(width: 10),
-                           const Text(
-                             'I agree with Terms & Conditions!',
-                             style: TextStyle(
-                               fontSize: 13,
-                               color: AppColors.navy,
-                               fontWeight: FontWeight.w500,
-                             ),
-                           ),
-                         ],
-                       ),
-                       const SizedBox(height: 22),
-                       const Text(
-                         'POWERED BY NANDGATE-IT',
-                         style: TextStyle(
-                           fontSize: 11,
-                           letterSpacing: 1.6,
-                           fontWeight: FontWeight.w700,
-                           color: AppColors.hint,
-                         ),
-                       ),
-                     ],
-                   ),
-                 ),
-               ],
-             );
-           },
-         );
-       },
-     ),
-   );
- }
-
-
- // ---------- Helpers ----------
-
-
- Widget _deco(IconData icon, double size) => Icon(
-       icon,
-       size: size,
-       color: AppColors.accent.withValues(alpha: 0.85),
-     );
-
-
- Widget _pillField({
-   required TextEditingController controller,
-   required String hint,
-   required IconData icon,
-   bool obscure = false,
-   bool enabled = true,
-   Widget? suffix,
-   TextInputType? keyboardType,
-   TextInputAction? textInputAction,
-   VoidCallback? onSubmitted,
- }) {
-   return Container(
-     height: 56,
-     decoration: BoxDecoration(
-       color: Colors.white,
-       borderRadius: BorderRadius.circular(30),
-       boxShadow: [
-         BoxShadow(
-           color: Colors.black.withValues(alpha: 0.05),
-           blurRadius: 10,
-           offset: const Offset(0, 3),
-         ),
-       ],
-     ),
-     child: TextField(
-       controller: controller,
-       obscureText: obscure,
-       enabled: enabled,
-       keyboardType: keyboardType,
-       textInputAction: textInputAction,
-       onSubmitted: (_) => onSubmitted?.call(),
-       style: const TextStyle(fontSize: 15, color: AppColors.navy),
-       decoration: InputDecoration(
-         hintText: hint,
-         hintStyle: const TextStyle(fontSize: 15, color: AppColors.hint),
-         prefixIcon: Icon(icon, color: AppColors.navy, size: 22),
-         suffixIcon: suffix,
-         border: InputBorder.none,
-         contentPadding: const EdgeInsets.symmetric(vertical: 17),
-       ),
-     ),
-   );
- }
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onSubmitted: (_) => onSubmitted?.call(),
+      style: const TextStyle(
+        fontSize: 14.5,
+        fontWeight: FontWeight.w500,
+        color: AppColors.darkText,
+      ),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: AppColors.inputFieldBg,
+        hintText: hint,
+        hintStyle: const TextStyle(
+          color: AppColors.placeholderText,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+        prefixIcon: Icon(icon, color: AppColors.bodyMutedText, size: 21),
+        suffixIcon: suffix,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: border(AppColors.inputBorderColor),
+        enabledBorder: border(AppColors.inputBorderColor),
+        focusedBorder: border(AppColors.ctaButtonBg, width: 1.5),
+        disabledBorder: border(AppColors.inputBorderColor),
+      ),
+    );
+  }
 }
-
-
-/// Dashed grid lines over the blue background
-class _GridPainter extends CustomPainter {
- @override
- void paint(Canvas canvas, Size size) {
-   final paint = Paint()
-     ..color = AppColors.gridLine.withValues(alpha: 0.55)
-     ..strokeWidth = 0.9;
-   const gap = 50.0;
-   const dash = 8.0;
-   const space = 5.0;
-
-
-   for (double x = 12; x < size.width; x += gap) {
-     for (double y = 0; y < size.height; y += dash + space) {
-       canvas.drawLine(Offset(x, y), Offset(x, y + dash), paint);
-     }
-   }
-   for (double y = 22; y < size.height; y += gap) {
-     for (double x = 0; x < size.width; x += dash + space) {
-       canvas.drawLine(Offset(x, y), Offset(x + dash, y), paint);
-     }
-   }
- }
-
-
- @override
- bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-
-/// White wavy bottom with brush strokes
-class _WavePainter extends CustomPainter {
- final double waveTop;
- _WavePainter({required this.waveTop});
-
-
- @override
- void paint(Canvas canvas, Size size) {
-   final w = size.width;
-   final h = size.height;
-
-
-   // Main white body
-   final path = Path()
-     ..moveTo(0, waveTop + 40)
-     ..cubicTo(w * 0.25, waveTop + 5, w * 0.45, waveTop + 55, w * 0.7,
-         waveTop + 25)
-     ..cubicTo(w * 0.85, waveTop + 8, w * 0.95, waveTop - 5, w, waveTop - 12)
-     ..lineTo(w, h)
-     ..lineTo(0, h)
-     ..close();
-   canvas.drawPath(path, Paint()..color = Colors.white);
-
-
-   // Brush strokes
-   final stroke = Paint()
-     ..color = Colors.white
-     ..style = PaintingStyle.stroke
-     ..strokeCap = StrokeCap.round;
-
-
-   stroke.strokeWidth = 5;
-   canvas.drawPath(
-     Path()
-       ..moveTo(0, waveTop + 38)
-       ..quadraticBezierTo(w * 0.5, waveTop + 8, w, waveTop - 22),
-     stroke,
-   );
-   stroke.strokeWidth = 2.5;
-   canvas.drawPath(
-     Path()
-       ..moveTo(w * 0.05, waveTop + 48)
-       ..quadraticBezierTo(w * 0.55, waveTop + 15, w, waveTop - 12),
-     stroke,
-   );
-
-
-   // Small speckles
-   final dot = Paint()..color = Colors.white.withValues(alpha: 0.9);
-   final dots = [
-     Offset(w * 0.08, waveTop + 8),
-     Offset(w * 0.18, waveTop - 4),
-     Offset(w * 0.40, waveTop + 18),
-     Offset(w * 0.55, waveTop + 6),
-     Offset(w * 0.75, waveTop - 4),
-     Offset(w * 0.88, waveTop - 18),
-   ];
-   for (final d in dots) {
-     canvas.drawCircle(d, 2.2, dot);
-   }
- }
-
-
- @override
- bool shouldRepaint(covariant _WavePainter old) => old.waveTop != waveTop;
-}
-
