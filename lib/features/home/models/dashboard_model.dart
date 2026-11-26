@@ -180,6 +180,48 @@ class DashboardLeaveBalance {
   final int pendingDays;
 }
 
+class BirthdayCalendarData {
+  const BirthdayCalendarData({required this.month, required this.birthdays});
+
+  factory BirthdayCalendarData.fromJson(Map<String, dynamic> json) {
+    return BirthdayCalendarData(
+      month: _asNullableInt(json['month']),
+      birthdays: _asList(json['birthdays'])
+          .map((item) => EmployeeBirthday.fromJson(_asMap(item)))
+          .toList(),
+    );
+  }
+
+  final int? month;
+  final List<EmployeeBirthday> birthdays;
+}
+
+class EmployeeBirthday {
+  const EmployeeBirthday({
+    required this.id,
+    required this.empCode,
+    required this.name,
+    required this.month,
+    required this.day,
+  });
+
+  factory EmployeeBirthday.fromJson(Map<String, dynamic> json) {
+    return EmployeeBirthday(
+      id: json['id']?.toString() ?? '',
+      empCode: json['emp_code']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      month: _asInt(json['month']),
+      day: _asInt(json['day']),
+    );
+  }
+
+  final String id;
+  final String empCode;
+  final String name;
+  final int month;
+  final int day;
+}
+
 List<DashboardEvent> _uniqueEvents(Iterable<DashboardEvent> events) {
   final seen = <String>{};
   return events.where((event) {
@@ -198,6 +240,12 @@ List<dynamic> _asList(dynamic value) => value is List ? value : const [];
 
 int _asInt(dynamic value) =>
     value is int ? value : int.tryParse(value?.toString() ?? '') ?? 0;
+
+int? _asNullableInt(dynamic value) {
+  if (value == null) return null;
+  final parsed = int.tryParse(value.toString());
+  return parsed;
+}
 
 DateTime? _dateTime(dynamic value) {
   if (value == null) return null;

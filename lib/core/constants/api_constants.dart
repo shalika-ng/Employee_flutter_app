@@ -16,6 +16,8 @@ class ApiConstants {
   static const String myAttendanceEndpoint = '/attendance/me';
   static const String myAttendanceDayEndpoint = '/attendance/me/day';
   static const String myDashboardEndpoint = '/employees/me/dashboard';
+  static const String myBirthdayCalendarEndpoint =
+      '/notifications/me/birthdays';
   static const String myCalendarEndpoint = '/employees/me/calendar';
   static const String myPayslipsEndpoint = '/payroll/payslips/me';
 

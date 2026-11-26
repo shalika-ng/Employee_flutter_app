@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -121,8 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Quote> _allQuotes = [];
   Quote? _currentQuote;
   bool _isLoadingQuotes = true;
+  final DashboardService _dashboardService = DashboardService();
   String? _dashboardToken;
   Future<DashboardData>? _dashboardFuture;
+  Future<BirthdayCalendarData>? _birthdayFuture;
 
   // Moods mapped to JSON 'moods' array IDs
   final List<Map<String, dynamic>> _moods = [
@@ -145,7 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final token = StoreProvider.of<AppState>(context).state.auth.token;
     if (token != null && token.isNotEmpty && token != _dashboardToken) {
       _dashboardToken = token;
-      _dashboardFuture = DashboardService().getMyDashboard(token: token);
+      _dashboardFuture = _dashboardService.getMyDashboard(token: token);
+      _birthdayFuture = _dashboardService.getMyBirthdays(token: token);
     }
   }
 
@@ -154,7 +158,16 @@ class _HomeScreenState extends State<HomeScreen> {
     if (token == null || token.isEmpty) return;
     setState(() {
       _dashboardToken = token;
-      _dashboardFuture = DashboardService().getMyDashboard(token: token);
+      _dashboardFuture = _dashboardService.getMyDashboard(token: token);
+      _birthdayFuture = _dashboardService.getMyBirthdays(token: token);
+    });
+  }
+
+  void _retryBirthdays() {
+    final token = StoreProvider.of<AppState>(context).state.auth.token;
+    if (token == null || token.isEmpty) return;
+    setState(() {
+      _birthdayFuture = _dashboardService.getMyBirthdays(token: token);
     });
   }
 
@@ -227,65 +240,60 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: SomaflowTheme.backgroundBottom,
-    body: Stack(
-      children: [
-        // Somaflow Ambient Waves Backdrop
-        Positioned.fill(
-          child: CustomPaint(
-            painter: _SomaflowBackgroundPainter(),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: SomaflowTheme.backgroundBottom,
+      body: Stack(
+        children: [
+          // Somaflow Ambient Waves Backdrop
+          Positioned.fill(
+            child: CustomPaint(painter: _SomaflowBackgroundPainter()),
           ),
-        ),
 
-        IndexedStack(
-          index: _currentBottomNavIndex,
-          children: [
-            // 0. Dashboard
-            _buildDashboardPage(),
+          IndexedStack(
+            index: _currentBottomNavIndex,
+            children: [
+              // 0. Dashboard
+              _buildDashboardPage(),
 
-            // 1. Attendance
-            _hasOpenedAttendance
-                ? AttendanceScreen(
-                    onNavigate: _navigateFromNestedPage,
-                  )
-                : const SizedBox.shrink(),
+              // 1. Attendance
+              _hasOpenedAttendance
+                  ? AttendanceScreen(onNavigate: _navigateFromNestedPage)
+                  : const SizedBox.shrink(),
 
-            // 2. Requests
-            const RequestsScreen(),
+              // 2. Requests
+              const RequestsScreen(),
 
-            // 3. Calendar
-            _hasOpenedCalendar
-                ? StoreConnector<AppState, String?>(
-                    distinct: true,
-                    converter: (store) => store.state.auth.token,
-                    builder: (context, token) =>
-                        HolidayCalendarScreen(token: token),
-                  )
-                : const SizedBox.shrink(),
+              // 3. Calendar
+              _hasOpenedCalendar
+                  ? StoreConnector<AppState, String?>(
+                      distinct: true,
+                      converter: (store) => store.state.auth.token,
+                      builder: (context, token) =>
+                          HolidayCalendarScreen(token: token),
+                    )
+                  : const SizedBox.shrink(),
 
-            // 4. Payslip
-            _hasOpenedPayslips
-                ? StoreConnector<AppState, String?>(
-                    distinct: true,
-                    converter: (store) => store.state.auth.token,
-                    builder: (context, token) => PayslipScreen(
-                      token: token,
-                      active: _currentBottomNavIndex == 4,
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ],
-        ),
-      ],
-    ),
+              // 4. Payslip
+              _hasOpenedPayslips
+                  ? StoreConnector<AppState, String?>(
+                      distinct: true,
+                      converter: (store) => store.state.auth.token,
+                      builder: (context, token) => PayslipScreen(
+                        token: token,
+                        active: _currentBottomNavIndex == 4,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ],
+          ),
+        ],
+      ),
 
-    // Bottom Navigation
-    bottomNavigationBar: _buildBottomNav(),
-  );
+      // Bottom Navigation
+      bottomNavigationBar: _buildBottomNav(),
+    );
   }
 
   void _selectNavigationItem(int index) {
@@ -335,6 +343,21 @@ Widget build(BuildContext context) {
                       _buildMoodCheckInCard(),
                       const SizedBox(height: 18),
                       _buildMonthlySnapshotSection(data),
+                      const SizedBox(height: 16),
+                      FutureBuilder<BirthdayCalendarData>(
+                        future: _birthdayFuture,
+                        builder: (context, birthdaySnapshot) {
+                          return _buildBirthdayCalendarSection(
+                            data: birthdaySnapshot.data,
+                            error: birthdaySnapshot.error,
+                            isLoading:
+                                birthdaySnapshot.connectionState ==
+                                    ConnectionState.waiting &&
+                                _birthdayFuture != null &&
+                                birthdaySnapshot.data == null,
+                          );
+                        },
+                      ),
                       if (data != null) ...[
                         const SizedBox(height: 18),
                         _buildUpcomingEvents(data),
@@ -367,7 +390,11 @@ Widget build(BuildContext context) {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: SomaflowTheme.lopCoral, size: 20),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: SomaflowTheme.lopCoral,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -381,8 +408,13 @@ Widget build(BuildContext context) {
           ),
           TextButton(
             onPressed: _retryDashboard,
-            style: TextButton.styleFrom(foregroundColor: SomaflowTheme.lopCoral),
-            child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: TextButton.styleFrom(
+              foregroundColor: SomaflowTheme.lopCoral,
+            ),
+            child: const Text(
+              'Retry',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -496,7 +528,11 @@ Widget build(BuildContext context) {
                 ),
               ],
             ),
-            child: const Icon(Icons.all_inclusive_rounded, size: 20, color: SomaflowTheme.sagePrimary),
+            child: const Icon(
+              Icons.all_inclusive_rounded,
+              size: 20,
+              color: SomaflowTheme.sagePrimary,
+            ),
           ),
           const SizedBox(width: 10),
           Stack(
@@ -600,7 +636,10 @@ Widget build(BuildContext context) {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _heroPill(icon: Icons.calendar_today_rounded, label: dateLabel),
+                  _heroPill(
+                    icon: Icons.calendar_today_rounded,
+                    label: dateLabel,
+                  ),
                   _heroPill(
                     icon: Icons.circle,
                     label: 'STATUS: $status',
@@ -655,7 +694,9 @@ Widget build(BuildContext context) {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -835,7 +876,10 @@ Widget build(BuildContext context) {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: SomaflowTheme.sageWash,
                     borderRadius: BorderRadius.circular(10),
@@ -880,16 +924,22 @@ Widget build(BuildContext context) {
                     width: 58,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: selected ? SomaflowTheme.sagePrimary : SomaflowTheme.cardTinted,
+                      color: selected
+                          ? SomaflowTheme.sagePrimary
+                          : SomaflowTheme.cardTinted,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: selected ? SomaflowTheme.sageDeep : SomaflowTheme.borderLight,
+                        color: selected
+                            ? SomaflowTheme.sageDeep
+                            : SomaflowTheme.borderLight,
                         width: selected ? 2 : 1,
                       ),
                       boxShadow: [
                         if (selected)
                           BoxShadow(
-                            color: SomaflowTheme.sageDeep.withValues(alpha: 0.25),
+                            color: SomaflowTheme.sageDeep.withValues(
+                              alpha: 0.25,
+                            ),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -908,8 +958,12 @@ Widget build(BuildContext context) {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 9.5,
-                            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                            color: selected ? Colors.white : SomaflowTheme.sageDeep,
+                            fontWeight: selected
+                                ? FontWeight.w900
+                                : FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : SomaflowTheme.sageDeep,
                           ),
                         ),
                       ],
@@ -978,7 +1032,10 @@ Widget build(BuildContext context) {
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator(color: SomaflowTheme.sagePrimary, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: SomaflowTheme.sagePrimary,
+                  strokeWidth: 2,
+                ),
               ),
             ),
         ],
@@ -1145,7 +1202,10 @@ Widget build(BuildContext context) {
               const SizedBox(width: 3),
               Container(
                 constraints: const BoxConstraints(maxWidth: 76),
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 1.5,
+                ),
                 decoration: BoxDecoration(
                   color: badgeColor,
                   borderRadius: BorderRadius.circular(6),
@@ -1200,6 +1260,265 @@ Widget build(BuildContext context) {
         ],
       ),
     );
+  }
+
+  Widget _buildBirthdayCalendarSection({
+    required BirthdayCalendarData? data,
+    required Object? error,
+    required bool isLoading,
+  }) {
+    final now = DateTime.now();
+    final birthdays = [...(data?.birthdays ?? const <EmployeeBirthday>[])]
+        .where((birthday) => birthday.month == now.month)
+        .toList()
+      ..sort((a, b) {
+        return a.day.compareTo(b.day);
+      });
+
+    final Widget content;
+    if (isLoading) {
+      content = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: _cardDecoration(),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: SomaflowTheme.sagePrimary,
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Loading birthdays...',
+                style: TextStyle(
+                  color: SomaflowTheme.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (error != null) {
+      content = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: SomaflowTheme.lopCoralBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: SomaflowTheme.lopCoral.withValues(alpha: 0.24),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: SomaflowTheme.lopCoral,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Unable to load birthdays.',
+                style: TextStyle(
+                  color: SomaflowTheme.lopCoral,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _retryBirthdays,
+              style: TextButton.styleFrom(
+                foregroundColor: SomaflowTheme.lopCoral,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (birthdays.isEmpty) {
+      content = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: _cardDecoration(),
+        child: const Text(
+          'No birthdays in this month.',
+          style: TextStyle(
+            color: SomaflowTheme.textMuted,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    } else {
+      content = Column(
+        children: birthdays
+            .take(4)
+            .map(
+              (birthday) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: _cardDecoration(),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: SomaflowTheme.cardTinted,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: SomaflowTheme.borderSubtle),
+                      ),
+                      child: const Icon(
+                        Icons.cake_outlined,
+                        size: 18,
+                        color: SomaflowTheme.sagePrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            birthday.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: SomaflowTheme.textCharcoal,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            birthday.empCode,
+                            style: const TextStyle(
+                              color: SomaflowTheme.textMuted,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      _birthdayDateLabel(birthday),
+                      style: const TextStyle(
+                        color: SomaflowTheme.sageDeep,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      );
+    }
+
+    return Container(
+      decoration: _cardDecoration(),
+      padding: const EdgeInsets.all(12),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: _BirthdayCelebrationDecor()),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: SomaflowTheme.cardFrosted,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: SomaflowTheme.borderLight),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: SomaflowTheme.sageWash,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: const Center(
+                        child: Text('🎂', style: TextStyle(fontSize: 18)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Birthday Celebrations',
+                            style: TextStyle(
+                              color: SomaflowTheme.textCharcoal,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: 1),
+                          Text(
+                            'Celebrate your teammates and send wishes.',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: SomaflowTheme.textMuted,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      'This month',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: SomaflowTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              content,
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _birthdayDateLabel(EmployeeBirthday birthday) {
+    if (birthday.month < 1 ||
+        birthday.month > 12 ||
+        birthday.day < 1 ||
+        birthday.day > 31) {
+      return '--';
+    }
+    final now = DateTime.now();
+    final date = DateTime(now.year, birthday.month, birthday.day);
+    if (date.month != birthday.month || date.day != birthday.day) return '--';
+    return MaterialLocalizations.of(context).formatShortDate(date);
   }
 
   // --- Upcoming Announcements ---
@@ -1270,7 +1589,11 @@ Widget build(BuildContext context) {
                       color: SomaflowTheme.sageWash,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(icon, size: 19, color: SomaflowTheme.sagePrimary),
+                    child: Icon(
+                      icon,
+                      size: 19,
+                      color: SomaflowTheme.sagePrimary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1339,11 +1662,7 @@ Widget build(BuildContext context) {
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.spa_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: const Icon(Icons.spa_rounded, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -1361,7 +1680,10 @@ Widget build(BuildContext context) {
                 SizedBox(height: 2),
                 Text(
                   '6s Inhale · Somatic Pacing · 12 mins',
-                  style: TextStyle(color: SomaflowTheme.textMuted, fontSize: 11),
+                  style: TextStyle(
+                    color: SomaflowTheme.textMuted,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -1390,17 +1712,17 @@ Widget build(BuildContext context) {
 
   // --- Frosted Card Decoration Helper ---
   BoxDecoration _cardDecoration() => BoxDecoration(
-        color: SomaflowTheme.cardFrosted,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: SomaflowTheme.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      );
+    color: SomaflowTheme.cardFrosted,
+    borderRadius: BorderRadius.circular(22),
+    border: Border.all(color: SomaflowTheme.borderLight),
+    boxShadow: [
+      BoxShadow(
+        color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  );
 
   // --- Floating Bottom Navigation Bar ---
   Widget _buildBottomNav() {
@@ -1408,6 +1730,144 @@ Widget build(BuildContext context) {
       currentIndex: _currentBottomNavIndex,
       onTap: _selectNavigationItem,
       items: employeeBottomNavItems,
+    );
+  }
+}
+
+class _BirthdayCelebrationDecor extends StatefulWidget {
+  const _BirthdayCelebrationDecor();
+
+  @override
+  State<_BirthdayCelebrationDecor> createState() =>
+      _BirthdayCelebrationDecorState();
+}
+
+class _BirthdayCelebrationDecorState extends State<_BirthdayCelebrationDecor>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  static const List<double> _confettiX = [0.07, 0.19, 0.31, 0.63, 0.78, 0.9];
+  static const List<double> _balloonX = [0.06, 0.16, 0.82, 0.93];
+  static const List<double> _phase = [0.2, 1.1, 2.4, 3.0, 4.2, 5.0];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 7),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final confettiColors = <Color>[
+      SomaflowTheme.sagePrimary,
+      SomaflowTheme.sageDeep,
+      SomaflowTheme.sageMuted,
+      SomaflowTheme.warmSand,
+      SomaflowTheme.sageLight,
+      SomaflowTheme.statusGreen,
+    ];
+    final balloonColors = <Color>[
+      SomaflowTheme.sagePrimary,
+      SomaflowTheme.warmSand,
+      SomaflowTheme.sageMuted,
+      SomaflowTheme.sageDeep,
+    ];
+
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final t = _controller.value;
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final height = constraints.maxHeight;
+              return Stack(
+                children: [
+                  for (var i = 0; i < _confettiX.length; i++)
+                    Positioned(
+                      left:
+                          width * _confettiX[i] +
+                          math.sin((t * math.pi * 2) + _phase[i]) * 4,
+                      top:
+                          ((t + i * 0.17) % 1.0) * (height + 32) -
+                          24 +
+                          math.sin((t * math.pi * 2) + _phase[i]) * 3,
+                      child: Transform.rotate(
+                        angle: (t * math.pi * 4) + _phase[i],
+                        child: Opacity(
+                          opacity: 0.35,
+                          child: Container(
+                            width: 3.2,
+                            height: 9,
+                            decoration: BoxDecoration(
+                              color: confettiColors[i % confettiColors.length],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  for (var i = 0; i < _balloonX.length; i++)
+                    Positioned(
+                      left:
+                          width * _balloonX[i] +
+                          math.sin((t * math.pi * 2) + _phase[i]) * 5,
+                      bottom: 2 + ((i % 2 == 0) ? (t * 10) : ((1 - t) * 10)),
+                      child: Opacity(
+                        opacity: 0.22,
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 14,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: balloonColors[i % balloonColors.length],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 16,
+                              color: SomaflowTheme.textMuted.withValues(
+                                alpha: 0.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 18 + math.sin(t * math.pi * 2) * 1.5,
+                    right: 14,
+                    child: Opacity(
+                      opacity: 0.2,
+                      child: Text('🎉', style: TextStyle(fontSize: 24)),
+                    ),
+                  ),
+                  Positioned(
+                    top: 44 + math.sin((t * math.pi * 2) + 1.8) * 1.5,
+                    left: 8,
+                    child: Opacity(
+                      opacity: 0.14,
+                      child: Text('✨', style: TextStyle(fontSize: 17)),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -1423,7 +1883,14 @@ class _SomaflowBackgroundPainter extends CustomPainter {
 
     final path1 = Path()
       ..moveTo(0, 0)
-      ..cubicTo(size.width * 0.45, 0, size.width * 0.55, size.height * 0.18, 0, size.height * 0.28)
+      ..cubicTo(
+        size.width * 0.45,
+        0,
+        size.width * 0.55,
+        size.height * 0.18,
+        0,
+        size.height * 0.28,
+      )
       ..close();
     canvas.drawPath(path1, paintSage);
 
@@ -1434,7 +1901,14 @@ class _SomaflowBackgroundPainter extends CustomPainter {
 
     final path2 = Path()
       ..moveTo(size.width * 0.5, 0)
-      ..cubicTo(size.width * 0.75, size.height * 0.08, size.width, size.height * 0.04, size.width, size.height * 0.20)
+      ..cubicTo(
+        size.width * 0.75,
+        size.height * 0.08,
+        size.width,
+        size.height * 0.04,
+        size.width,
+        size.height * 0.20,
+      )
       ..lineTo(size.width, 0)
       ..close();
     canvas.drawPath(path2, paintSand);

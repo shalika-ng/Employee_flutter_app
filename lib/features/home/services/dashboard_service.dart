@@ -24,4 +24,21 @@ class DashboardService {
     }
     throw ApiException('Invalid dashboard response from server.');
   }
+
+  Future<BirthdayCalendarData> getMyBirthdays({required String token}) async {
+    final response = await _apiClient.get(
+      ApiConstants.myBirthdayCalendarEndpoint,
+      token: token,
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return BirthdayCalendarData.fromJson(data);
+    }
+    if (data is Map) {
+      return BirthdayCalendarData.fromJson(
+        data.map((key, value) => MapEntry('$key', value)),
+      );
+    }
+    throw ApiException('Invalid birthdays response from server.');
+  }
 }
