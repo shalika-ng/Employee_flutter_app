@@ -37,13 +37,14 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 100)),
     );
     await tester.pump();
-    expect(find.textContaining('— '), findsNothing);
+    final author = find.textContaining(RegExp(r'^— '));
+    expect(author, findsNothing);
     expect(find.text('🧘'), findsOneWidget);
 
     await tester.tap(find.text('🧘'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.textContaining('— '), findsOneWidget);
+    expect(author, findsOneWidget);
     expect(find.text('Reset'), findsOneWidget);
   });
 
@@ -66,14 +67,16 @@ void main() {
     await tester.tap(find.byTooltip('Calendar'));
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Calendar'), findsOneWidget);
-    expect(
-      find.text('Your shifts and important dates will appear here.'),
-      findsOneWidget,
-    );
+    expect(find.text('Holiday Calendar'), findsOneWidget);
+    expect(find.text('Sign in to view your calendar.'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Home'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Mindful Daily Dashboard'), findsOneWidget);
+    expect(find.text('Mindful Presence & Focus'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Payslip'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Payslips & Salary Statements'), findsOneWidget);
+    expect(find.text('Sign in to view your payslips.'), findsOneWidget);
   });
 }

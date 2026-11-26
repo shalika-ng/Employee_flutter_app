@@ -1,13 +1,45 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 
+// Kept so existing exports keep compiling; remove if the analyzer reports it unused.
+// ignore: unused_import
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/modern_curved_bottom_nav.dart';
 import '../../../redux/app_state.dart';
 import '../services/attendance_request_service.dart';
+// SomaflowTheme (sage green & warm parchment tokens) lives in the attendance screen.
+import 'attendance_screen.dart' show SomaflowTheme;
 
 enum AttendanceRequestType { leave, permission, regularization }
+
+/* ------------------------------------------------------------------ */
+/*  Text styles (Somaflow tokens)                                      */
+/* ------------------------------------------------------------------ */
+
+const TextStyle _sectionTitle = TextStyle(
+  color: SomaflowTheme.textCharcoal,
+  fontSize: 16,
+  fontWeight: FontWeight.w900,
+);
+
+const TextStyle _cardTitle = TextStyle(
+  color: SomaflowTheme.textCharcoal,
+  fontSize: 15,
+  fontWeight: FontWeight.w800,
+);
+
+const TextStyle _body = TextStyle(
+  color: SomaflowTheme.textMuted,
+  fontSize: 14,
+  height: 1.4,
+);
+
+const TextStyle _caption = TextStyle(
+  color: SomaflowTheme.textMuted,
+  fontSize: 12.5,
+  fontWeight: FontWeight.w600,
+);
 
 class AttendanceRequestFormScreen extends StatefulWidget {
   const AttendanceRequestFormScreen({
@@ -78,50 +110,47 @@ class _AttendanceRequestFormScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: HomeTheme.backgroundTop,
-      appBar: AppBar(
-        backgroundColor: HomeTheme.heroGradientStart,
-        foregroundColor: Colors.white,
-        title: Text(
-          _title,
-          style: HomeTheme.headerTitle.copyWith(color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Home',
-            onPressed: () =>
-                Navigator.of(context).popUntil((route) => route.isFirst),
-            icon: const Icon(Icons.home_outlined),
+      backgroundColor: SomaflowTheme.backgroundBottom,
+      body: Stack(
+        children: [
+          // Somaflow organic ripples ambient backdrop
+          Positioned.fill(
+            child: CustomPaint(painter: _FormBackgroundPainter()),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: _submittedRequest == null
+                      ? Form(
+                          key: _formKey,
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                            children: [
+                              _buildHeroCard(),
+                              const SizedBox(height: 14),
+                              if (widget.type == AttendanceRequestType.leave)
+                                _buildLeaveForm(),
+                              if (widget.type ==
+                                  AttendanceRequestType.permission)
+                                _buildPermissionForm(),
+                              if (widget.type ==
+                                  AttendanceRequestType.regularization)
+                                _buildRegularizationForm(),
+                            ],
+                          ),
+                        )
+                      : ListView(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                          children: [_buildSubmittedRequestCard()],
+                        ),
+                ),
+              ],
+            ),
           ),
         ],
-      ),
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [HomeTheme.backgroundTop, HomeTheme.backgroundBottom],
-          ),
-        ),
-        child: _submittedRequest == null
-            ? Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-                  children: [
-                    if (widget.type == AttendanceRequestType.leave)
-                      _buildLeaveForm(),
-                    if (widget.type == AttendanceRequestType.permission)
-                      _buildPermissionForm(),
-                    if (widget.type == AttendanceRequestType.regularization)
-                      _buildRegularizationForm(),
-                  ],
-                ),
-              )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-                children: [_buildSubmittedRequestCard()],
-              ),
       ),
       bottomNavigationBar: widget.onNavigate == null
           ? _buildBottomBar()
@@ -138,6 +167,199 @@ class _AttendanceRequestFormScreenState
             ),
     );
   }
+
+  /* ------------------------------ HEADER ----------------------------- */
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: SomaflowTheme.backgroundBottom.withValues(alpha: 0.95),
+        border: const Border(
+          bottom: BorderSide(color: SomaflowTheme.borderLight, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (Navigator.of(context).canPop())
+            IconButton(
+              tooltip: 'Back',
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              color: SomaflowTheme.textCharcoal,
+            )
+          else
+            const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ATTENDANCE REQUEST',
+                  style: TextStyle(
+                    color: SomaflowTheme.sagePrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                Text(
+                  _title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: SomaflowTheme.textCharcoal,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Home',
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
+            icon: const Icon(Icons.home_outlined, size: 24),
+            color: SomaflowTheme.sagePrimary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* ----------------------------- HERO CARD --------------------------- */
+
+  Widget _buildHeroCard() {
+    final IconData icon;
+    final String subtitle;
+    switch (widget.type) {
+      case AttendanceRequestType.leave:
+        icon = Icons.event_available_outlined;
+        subtitle = 'Choose your dates and tell us why you need time off.';
+      case AttendanceRequestType.permission:
+        icon = Icons.description_outlined;
+        subtitle = 'Pick a time window and check your monthly balance.';
+      case AttendanceRequestType.regularization:
+        icon = Icons.edit_calendar_outlined;
+        subtitle = 'Correct your punch in and punch out times for the day.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [SomaflowTheme.sagePrimary, SomaflowTheme.sageDeep],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: SomaflowTheme.sageDeep.withValues(alpha: 0.26),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            bottom: -30,
+            child: Opacity(
+              opacity: 0.12,
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 20),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.white.withValues(alpha: 0.2),
+                  child: Icon(icon, color: Colors.white, size: 26),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_requestDate != null) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    _formatDate(_requestDate!),
+                    style: const TextStyle(
+                      color: SomaflowTheme.sageDeep,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* ------------------------------- FORMS ----------------------------- */
 
   Widget _buildLeaveForm() {
     return Column(
@@ -210,6 +432,11 @@ class _AttendanceRequestFormScreenState
                   child: TextFormField(
                     controller: _permissionMinutesController,
                     keyboardType: TextInputType.number,
+                    style: const TextStyle(
+                      color: SomaflowTheme.textCharcoal,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                     decoration: _fieldDecoration('MINUTES'),
                     validator: (value) {
                       final minutes = int.tryParse(value?.trim() ?? '');
@@ -236,9 +463,9 @@ class _AttendanceRequestFormScreenState
         title: 'Permission balance',
         icon: Icons.timelapse_rounded,
         children: [
-          Text(
+          const Text(
             'Sign in to view your permission balance.',
-            style: HomeTheme.body,
+            style: _body,
           ),
         ],
       );
@@ -255,11 +482,15 @@ class _AttendanceRequestFormScreenState
             title: 'Permission balance',
             icon: Icons.timelapse_rounded,
             children: [
-              Text(message, style: HomeTheme.body),
+              Text(message, style: _body),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: _refreshPermissionBalance,
+                  style: TextButton.styleFrom(
+                    foregroundColor: SomaflowTheme.sagePrimary,
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                   child: const Text('Retry'),
                 ),
               ),
@@ -275,7 +506,7 @@ class _AttendanceRequestFormScreenState
             children: [
               const Center(
                 child: CircularProgressIndicator(
-                  color: HomeTheme.accentBlue,
+                  color: SomaflowTheme.sagePrimary,
                   strokeWidth: 2,
                 ),
               ),
@@ -289,20 +520,30 @@ class _AttendanceRequestFormScreenState
           children: [
             Text(
               '${_monthName(balance.month)} ${balance.year}',
-              style: HomeTheme.caption,
+              style: _caption,
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 _balanceMetric('Monthly limit', balance.monthlyLimit),
+                const SizedBox(width: 10),
                 _balanceMetric('Used', balance.usedMinutes),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Row(
               children: [
-                _balanceMetric('Pending', balance.pendingMinutes),
-                _balanceMetric('Remaining', balance.remainingMinutes),
+                _balanceMetric(
+                  'Pending',
+                  balance.pendingMinutes,
+                  accent: SomaflowTheme.halfDayAmber,
+                ),
+                const SizedBox(width: 10),
+                _balanceMetric(
+                  'Remaining',
+                  balance.remainingMinutes,
+                  accent: SomaflowTheme.statusGreen,
+                ),
               ],
             ),
           ],
@@ -311,15 +552,30 @@ class _AttendanceRequestFormScreenState
     );
   }
 
-  Widget _balanceMetric(String label, int minutes) {
+  Widget _balanceMetric(
+    String label,
+    int minutes, {
+    Color accent = SomaflowTheme.textCharcoal,
+  }) {
     return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: HomeTheme.caption),
-          const SizedBox(height: 3),
-          Text(_formatMinutes(minutes), style: HomeTheme.cardTitle),
-        ],
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: SomaflowTheme.chipBackground,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: SomaflowTheme.borderLight),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: _caption),
+            const SizedBox(height: 3),
+            Text(
+              _formatMinutes(minutes),
+              style: _cardTitle.copyWith(color: accent, fontSize: 17),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -409,23 +665,73 @@ class _AttendanceRequestFormScreenState
 
   Widget _buildSubmittedRequestCard() {
     final request = _submittedRequest!;
+    final cancelled = _requestCancelled;
     return _formCard(
-      title: _requestCancelled ? 'Request cancelled' : 'Request submitted',
-      icon: _requestCancelled
+      title: cancelled ? 'Request cancelled' : 'Request submitted',
+      icon: cancelled
           ? Icons.event_busy_outlined
           : Icons.check_circle_outline_rounded,
       children: [
-        Text(request.message, style: HomeTheme.body),
-        const SizedBox(height: 8),
-        Text('Request ID: ${request.id}', style: HomeTheme.caption),
-        const SizedBox(height: 4),
-        Text(
-          'Status: ${_requestCancelled ? 'CANCELLED' : 'PENDING'}',
-          style: HomeTheme.caption,
+        Text(request.message, style: _body),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: SomaflowTheme.chipBackground,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: SomaflowTheme.borderLight),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text('Request ID: ${request.id}', style: _caption),
+              ),
+              _statusChip(
+                cancelled ? 'CANCELLED' : 'PENDING',
+                fg: cancelled
+                    ? SomaflowTheme.absentCoral
+                    : SomaflowTheme.halfDayAmber,
+                bg: cancelled
+                    ? SomaflowTheme.absentBg
+                    : SomaflowTheme.halfDayBg,
+                border: cancelled
+                    ? SomaflowTheme.absentBorder
+                    : SomaflowTheme.halfDayBorder,
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
+
+  Widget _statusChip(
+    String label, {
+    required Color fg,
+    required Color bg,
+    required Color border,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fg,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  /* ----------------------------- BUILDING BLOCKS --------------------- */
 
   Widget _formCard({
     required String title,
@@ -436,13 +742,14 @@ class _AttendanceRequestFormScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: SomaflowTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SomaflowTheme.borderLight),
         boxShadow: [
           BoxShadow(
-            color: HomeTheme.primaryText.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 7),
+            color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -452,16 +759,16 @@ class _AttendanceRequestFormScreenState
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: HomeTheme.chipBlueBackground,
-                  borderRadius: BorderRadius.circular(14),
+                  color: SomaflowTheme.chipBackground,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: HomeTheme.heroGradientStart, size: 21),
+                child: Icon(icon, color: SomaflowTheme.sagePrimary, size: 21),
               ),
               const SizedBox(width: 12),
-              Text(title, style: HomeTheme.sectionTitle),
+              Expanded(child: Text(title, style: _sectionTitle)),
             ],
           ),
           const SizedBox(height: 16),
@@ -478,7 +785,7 @@ class _AttendanceRequestFormScreenState
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InputDecorator(
         decoration: _fieldDecoration(label),
         child: Row(
@@ -488,15 +795,16 @@ class _AttendanceRequestFormScreenState
                 value == null ? 'Select date' : _formatDate(value),
                 style: TextStyle(
                   color: value == null
-                      ? HomeTheme.secondaryText
-                      : HomeTheme.primaryText,
+                      ? SomaflowTheme.textSubtle
+                      : SomaflowTheme.textCharcoal,
                   fontSize: 15,
+                  fontWeight: value == null ? FontWeight.w500 : FontWeight.w700,
                 ),
               ),
             ),
             const Icon(
               Icons.calendar_month_outlined,
-              color: HomeTheme.secondaryText,
+              color: SomaflowTheme.sagePrimary,
               size: 21,
             ),
           ],
@@ -512,7 +820,7 @@ class _AttendanceRequestFormScreenState
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InputDecorator(
         decoration: _fieldDecoration(label),
         child: Row(
@@ -522,15 +830,16 @@ class _AttendanceRequestFormScreenState
                 value?.format(context) ?? 'Select time',
                 style: TextStyle(
                   color: value == null
-                      ? HomeTheme.secondaryText
-                      : HomeTheme.primaryText,
+                      ? SomaflowTheme.textSubtle
+                      : SomaflowTheme.textCharcoal,
                   fontSize: 14,
+                  fontWeight: value == null ? FontWeight.w500 : FontWeight.w700,
                 ),
               ),
             ),
             const Icon(
               Icons.access_time_rounded,
-              color: HomeTheme.secondaryText,
+              color: SomaflowTheme.sagePrimary,
               size: 20,
             ),
           ],
@@ -549,6 +858,10 @@ class _AttendanceRequestFormScreenState
           minLines: 4,
           maxLines: 6,
           textCapitalization: TextCapitalization.sentences,
+          style: const TextStyle(
+            color: SomaflowTheme.textCharcoal,
+            fontSize: 15,
+          ),
           decoration: _fieldDecoration(
             isRequired ? 'Why do you need this?' : 'Add a reason (optional)',
           ),
@@ -573,9 +886,13 @@ class _AttendanceRequestFormScreenState
           label: const Text('Attach file (optional)'),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(52),
-            foregroundColor: HomeTheme.heroGradientStart,
-            backgroundColor: HomeTheme.chipBlueBackground,
-            side: BorderSide.none,
+            foregroundColor: SomaflowTheme.sageDeep,
+            backgroundColor: SomaflowTheme.chipBackground,
+            side: const BorderSide(color: SomaflowTheme.borderLight),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
@@ -589,27 +906,41 @@ class _AttendanceRequestFormScreenState
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(
-        color: HomeTheme.secondaryText,
+        color: SomaflowTheme.textMuted,
         fontWeight: FontWeight.w600,
       ),
+      floatingLabelStyle: const TextStyle(
+        color: SomaflowTheme.sagePrimary,
+        fontWeight: FontWeight.w800,
+      ),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: SomaflowTheme.surfaceContainerLow,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: HomeTheme.borderBlue),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: SomaflowTheme.borderLight),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: HomeTheme.accentBlue, width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: SomaflowTheme.sagePrimary,
+          width: 1.5,
+        ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFB42336)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: SomaflowTheme.absentCoral),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFB42336), width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: SomaflowTheme.absentCoral,
+          width: 1.5,
+        ),
+      ),
+      errorStyle: const TextStyle(
+        color: SomaflowTheme.absentCoral,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
@@ -622,9 +953,9 @@ class _AttendanceRequestFormScreenState
       bottom: widget.onNavigate == null,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: HomeTheme.borderBlue)),
+        decoration: const BoxDecoration(
+          color: SomaflowTheme.surfaceContainerLow,
+          border: Border(top: BorderSide(color: SomaflowTheme.borderLight)),
         ),
         child: requestSubmitted && requestCancelled
             ? FilledButton(
@@ -640,8 +971,12 @@ class _AttendanceRequestFormScreenState
                       onPressed: () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(54),
-                        foregroundColor: HomeTheme.primaryText,
-                        side: const BorderSide(color: HomeTheme.borderBlue),
+                        foregroundColor: SomaflowTheme.textCharcoal,
+                        side: const BorderSide(color: SomaflowTheme.borderLight),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -658,7 +993,11 @@ class _AttendanceRequestFormScreenState
                           : requestSubmitted
                           ? _confirmCancelRequest
                           : _submit,
-                      style: _primaryButtonStyle(),
+                      style: _primaryButtonStyle(
+                        color: requestSubmitted
+                            ? SomaflowTheme.absentCoral
+                            : SomaflowTheme.sagePrimary,
+                      ),
                       child: _isBusy
                           ? const SizedBox(
                               width: 20,
@@ -681,13 +1020,22 @@ class _AttendanceRequestFormScreenState
     );
   }
 
-  ButtonStyle _primaryButtonStyle() => FilledButton.styleFrom(
-    minimumSize: const Size.fromHeight(54),
-    backgroundColor: HomeTheme.heroGradientStart,
-    foregroundColor: Colors.white,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    textStyle: HomeTheme.cardTitle.copyWith(color: Colors.white, fontSize: 13),
-  );
+  ButtonStyle _primaryButtonStyle({Color color = SomaflowTheme.sagePrimary}) =>
+      FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(54),
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: SomaflowTheme.sageMuted.withValues(alpha: 0.6),
+        disabledForegroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        textStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+
+  /* --------------------------- LOGIC (UNCHANGED) --------------------- */
 
   Future<void> _pickDate({bool isToDate = false}) async {
     final initial = isToDate ? (_toDate ?? _requestDate) : _requestDate;
@@ -699,7 +1047,7 @@ class _AttendanceRequestFormScreenState
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme
-              .copyWith(primary: HomeTheme.accentBlue),
+              .copyWith(primary: SomaflowTheme.sagePrimary),
         ),
         child: child!,
       ),
@@ -747,7 +1095,7 @@ class _AttendanceRequestFormScreenState
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme
-              .copyWith(primary: HomeTheme.accentBlue),
+              .copyWith(primary: SomaflowTheme.sagePrimary),
         ),
         child: child!,
       ),
@@ -825,20 +1173,37 @@ class _AttendanceRequestFormScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel request?'),
+        backgroundColor: SomaflowTheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text(
+          'Cancel request?',
+          style: TextStyle(
+            color: SomaflowTheme.textCharcoal,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
         content: const Text(
           'This will cancel the request you just submitted. Continue?',
+          style: TextStyle(color: SomaflowTheme.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: SomaflowTheme.sageDeep,
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
             child: const Text('Keep request'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFB42336),
+              backgroundColor: SomaflowTheme.absentCoral,
               foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Yes, cancel'),
           ),
@@ -882,11 +1247,53 @@ class _AttendanceRequestFormScreenState
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: HomeTheme.accentBlue),
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: SomaflowTheme.sagePrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
     );
   }
 
   String _formatDate(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/'
       '${date.month.toString().padLeft(2, '0')}/${date.year}';
+}
+
+/// Somaflow ambient organic ripples (same shapes as the attendance screen).
+class _FormBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintSage = Paint()
+      ..color = SomaflowTheme.sageMuted.withValues(alpha: 0.16)
+      ..style = PaintingStyle.fill;
+    final paintSand = Paint()
+      ..color = SomaflowTheme.warmSand.withValues(alpha: 0.14)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, 0)
+        ..cubicTo(size.width * 0.45, 0, size.width * 0.55, size.height * 0.18, 0,
+            size.height * 0.28)
+        ..close(),
+      paintSage,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.5, 0)
+        ..cubicTo(size.width * 0.75, size.height * 0.08, size.width,
+            size.height * 0.04, size.width, size.height * 0.20)
+        ..lineTo(size.width, 0)
+        ..close(),
+      paintSand,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

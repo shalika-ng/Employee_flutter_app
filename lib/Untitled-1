@@ -1,0 +1,2034 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_redux/flutter_redux.dart';
+
+import '../../../app/theme/app_theme.dart';
+import '../../../redux/app_state.dart';
+import '../models/attendance_models.dart';
+import '../redux/attendance_actions.dart';
+import '../redux/attendance_state.dart';
+import 'attendance_request_form_screen.dart';
+
+/// Earthy Warm Color Palette Constants
+class EarthyTheme {
+  // existing names (kept so other files don't break)
+  static const Color forestOlive = Color(0xFF5D6953);
+  static const Color deepOlive = Color(0xFF414B3A);
+  static const Color sage = Color(0xFF707C65);
+  static const Color sageLight = Color(0xFF848F76);
+  static const Color sageBackground = Color(0xFFF6F8F3);
+  static const Color sageBorder = Color(0xFFD9E2D2);
+  static const Color terracotta = Color(0xFFC85D44);
+  static const Color terracottaBackground = Color(0xFFFEF1EC);
+  static const Color terracottaBorder = Color(0xFFF4C8B9);
+  static const Color warmSand = Color(0xFFE3BF96);
+  static const Color warmSandLight = Color(0xFFFDF8F0);
+  static const Color creamCanvas = Color(0xFFFCFAF7);
+  static const Color backgroundSand = Color(0xFFFBF7F0);
+  static const Color borderSand = Color(0xFFECE3D3);
+  static const Color headerBeige = Color(0xFFF7F3EB);
+  static const Color textDark = Color(0xFF292524); // stone-800
+  static const Color textMuted = Color(0xFF78716C); // stone-500
+
+  // new
+  static const Color border2 = Color(0xFFE5DDCE);
+  static const Color oliveText = Color(0xFF46513F);
+  static const Color oliveBg2 = Color(0xFFEAF0E6);
+  static const Color clay = Color(0xFFC87961); // primary action
+  static const Color clayDark = Color(0xFFB86A54);
+  static const Color rust = Color(0xFFB24832);
+  static const Color amber = Color(0xFF9B6A38);
+  static const Color amberDark = Color(0xFF815526);
+  static const Color amberBorder = Color(0xFFEDD7BE);
+  static const Color weekendBg = Color(0xFFFDF9F2);
+  static const Color weekendBorder = Color(0xFFE7D8C5);
+  static const Color weekStartBg = Color(0xFFF9FBF7);
+  static const Color weekStartBorder = Color(0xFFBCC7B4);
+  static const Color text900 = Color(0xFF1C1917);
+  static const Color text700 = Color(0xFF44403C);
+  static const Color text600 = Color(0xFF57534E);
+  static const Color text400 = Color(0xFFA8A29E);
+}
+
+class AttendanceScreen extends StatefulWidget {
+  const AttendanceScreen({this.onNavigate, super.key});
+
+  final ValueChanged<int>? onNavigate;
+
+  @override
+  State<AttendanceScreen> createState() => _AttendanceScreenState();
+}
+
+class _AttendanceScreenState extends State<AttendanceScreen> {
+  static const _filterPills = [
+    'All Status',
+    'Present',
+    'Late',
+    'Half Day',
+    'Needs Action',
+  ];
+
+  late DateTime _month;
+  bool _requestedInitialData = false;
+  String _filter = 'All Status';
+  String? _expandedLog;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _month = DateTime(now.year, now.month);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_requestedInitialData) return;
+    _requestedInitialData = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadMonth();
+    });
+  }
+
+  void _loadMonth() {
+    StoreProvider.of<AppState>(context).dispatch(
+      FetchAttendanceMonthAction(month: _month.month, year: _month.year),
+    );
+  }
+
+  void _loadDay(DateTime date) {
+    StoreProvider.of<AppState>(context)
+        .dispatch(FetchAttendanceDayAction(date: _dateKey(date)));
+  }
+
+  void _changeMonth(int offset) {
+    setState(() {
+      _month = DateTime(_month.year, _month.month + offset);
+    });
+    _loadMonth();
+  }
+
+  Future<void> _pickDate(DateTime initial) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: EarthyTheme.forestOlive,
+            onPrimary: Colors.white,
+            surface: EarthyTheme.creamCanvas,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) _goToDate(picked);
+  }
+
+  void _goToDate(DateTime date) {
+    if (date.month != _month.month || date.year != _month.year) {
+      setState(() => _month = DateTime(date.year, date.month));
+      _loadMonth();
+    }
+    _loadDay(date);
+  }
+
+  void _openRequest(AttendanceRequestType type, DateTime? date) {
+    if (date == null) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AttendanceRequestFormScreen(
+          type: type,
+          initialDate: date,
+          onNavigate: widget.onNavigate,
+        ),
+      ),
+    );
+  }
+
+  bool _matches(AttendanceDaySummary d) {
+    switch (_filter) {
+      case 'Present':
+        return d.status.toUpperCase() == 'PRESENT';
+      case 'Late':
+        return d.isLate;
+      case 'Half Day':
+        return d.status.toUpperCase() == 'HALF_DAY';
+      case 'Needs Action':
+        return d.needsRegularization;
+      default:
+        return true;
+    }
+  }
+
+  /* ------------------------------ BUILD ------------------------------ */
+
+  @override
+  Widget build(BuildContext context) {
+    return StoreConnector<AppState, AttendanceState>(
+      converter: (store) => store.state.attendance,
+      onWillChange: (previous, current) {
+        if (previous?.dayStatus == AttendanceLoadStatus.loading &&
+            current.dayStatus == AttendanceLoadStatus.success &&
+            current.dayData != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showDayPopup(current.dayData!);
+          });
+        } else if (previous?.dayStatus == AttendanceLoadStatus.loading &&
+            current.dayStatus == AttendanceLoadStatus.failure) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  current.dayError ?? 'Unable to load day details.',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                backgroundColor: EarthyTheme.terracotta,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            );
+          });
+        }
+      },
+      builder: (context, state) {
+        return Scaffold(
+          backgroundColor: EarthyTheme.backgroundSand,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(painter: _AbstractOrganicPainter()),
+              ),
+              SafeArea(
+                child: RefreshIndicator(
+                  color: EarthyTheme.forestOlive,
+                  backgroundColor: EarthyTheme.creamCanvas,
+                  onRefresh: () async {
+                    _loadMonth();
+                    await Future<void>.delayed(const Duration(milliseconds: 350));
+                  },
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: EarthyTheme.creamCanvas,
+                          borderRadius: BorderRadius.circular(32),
+                          border: Border.all(
+                            color: EarthyTheme.borderSand.withValues(alpha: 0.8),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF483C2D).withValues(alpha: 0.08),
+                              blurRadius: 40,
+                              offset: const Offset(0, 16),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHeader(state),
+                            const SizedBox(height: 16),
+                            _buildFilterCard(state),
+                            if (state.monthData != null) ...[
+                              const SizedBox(height: 16),
+                              _buildTodayCard(state.monthData!.today),
+                              const SizedBox(height: 16),
+                              _buildSummary(
+                                state.monthData!.totals,
+                                state.monthData!.days.length,
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            _buildHistoryCard(state),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /* ------------------------------ HEADER ----------------------------- */
+
+  Widget _buildHeader(AttendanceState state) {
+    final employee = state.monthData?.employee;
+    final focus = DateTime.tryParse(state.selectedDate ?? '') ?? DateTime.now();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _Eyebrow('SHIFT OVERVIEW & LOGS'),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Attendance & Work Logs',
+                    style: TextStyle(
+                      color: EarthyTheme.text900,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      height: 1.15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Refresh attendance',
+              onPressed: _loadMonth,
+              icon: const Icon(Icons.refresh_rounded),
+              color: EarthyTheme.forestOlive,
+              style: IconButton.styleFrom(
+                backgroundColor: EarthyTheme.sageBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: EarthyTheme.sageBorder),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          employee == null
+              ? 'Track check-ins, verify working hours, and manage leave requests.'
+              : '${employee.name} · ${employee.designation} · ${employee.empCode}',
+          style: const TextStyle(
+            color: EarthyTheme.text600,
+            fontSize: 13.5,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    _openRequest(AttendanceRequestType.regularization, focus),
+                icon: const Icon(Icons.tune_rounded, size: 16, color: EarthyTheme.sage),
+                label: const Text('Regularize'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: EarthyTheme.oliveText,
+                  backgroundColor: EarthyTheme.sageBackground,
+                  side: const BorderSide(color: EarthyTheme.sageBorder),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => _showApplySheet(focus),
+                icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                label: const Text('Apply Leave'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: EarthyTheme.clay,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        const Divider(height: 1, color: EarthyTheme.borderSand),
+      ],
+    );
+  }
+
+  void _showApplySheet(DateTime focus) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: EarthyTheme.creamCanvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _Eyebrow('QUICK ACTION', color: EarthyTheme.sage),
+                      Text(
+                        'Apply Leave / Permission',
+                        style: TextStyle(
+                          color: EarthyTheme.text900,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  icon: const Icon(Icons.close_rounded, color: EarthyTheme.text400),
+                ),
+              ],
+            ),
+            const Divider(color: EarthyTheme.borderSand),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _bigAction('APPLY LEAVE', () {
+                    Navigator.pop(sheetContext);
+                    _openRequest(AttendanceRequestType.leave, focus);
+                  }),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _bigAction('APPLY PERMISSION', () {
+                    Navigator.pop(sheetContext);
+                    _openRequest(AttendanceRequestType.permission, focus);
+                  }),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bigAction(String label, VoidCallback onTap) {
+    return Material(
+      color: EarthyTheme.clay,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /* ----------------------------- FILTERS ----------------------------- */
+
+  Widget _buildFilterCard(AttendanceState state) {
+    final selected = DateTime.tryParse(state.selectedDate ?? '');
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: EarthyTheme.border2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${_monthName(_month.month)} ${_month.year}',
+                  style: const TextStyle(
+                    color: EarthyTheme.text900,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Previous month',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _changeMonth(-1),
+                icon: const Icon(Icons.chevron_left_rounded),
+                color: EarthyTheme.forestOlive,
+              ),
+              IconButton(
+                tooltip: 'Next month',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _changeMonth(1),
+                icon: const Icon(Icons.chevron_right_rounded),
+                color: EarthyTheme.forestOlive,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _pickDate(selected ?? DateTime.now()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: EarthyTheme.creamCanvas,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: EarthyTheme.border2),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'DATE',
+                          style: TextStyle(
+                            color: EarthyTheme.forestOlive,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            selected == null ? 'Pick a date' : _dateKey(selected),
+                            style: const TextStyle(
+                              color: EarthyTheme.text900,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.expand_more_rounded,
+                            size: 18, color: EarthyTheme.textMuted),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () => _goToDate(DateTime.now()),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: EarthyTheme.text700,
+                  side: const BorderSide(color: EarthyTheme.border2),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                child: const Text('Today'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const _Eyebrow('FILTER'),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _filterPills.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final pill = _filterPills[i];
+                final active = pill == _filter;
+                return GestureDetector(
+                  onTap: () => setState(() => _filter = pill),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: active ? EarthyTheme.clay : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: active ? null : Border.all(color: EarthyTheme.borderSand),
+                    ),
+                    child: Text(
+                      pill,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: active ? Colors.white : EarthyTheme.text600,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* ----------------------------- TODAY CARD -------------------------- */
+
+  Widget _buildTodayCard(AttendanceToday today) {
+    final isIn = today.status.toUpperCase() == 'IN';
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: _cardDecoration(),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: EarthyTheme.sageBackground,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: EarthyTheme.sageBorder),
+            ),
+            child: Icon(
+              isIn ? Icons.login_rounded : Icons.schedule_rounded,
+              color: EarthyTheme.forestOlive,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Today's Status",
+                  style: TextStyle(
+                    color: EarthyTheme.text900,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  'Real-time biometric shift punch',
+                  style: TextStyle(color: EarthyTheme.textMuted, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+          _statusPill(today.status),
+          if (today.lastPunch != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: EarthyTheme.headerBeige,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: EarthyTheme.borderSand),
+              ),
+              child: Text(
+                _formatTime(today.lastPunch),
+                style: const TextStyle(
+                  color: EarthyTheme.textDark,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /* ----------------------------- METRICS ----------------------------- */
+
+  Widget _buildSummary(AttendanceTotals totals, int totalDays) {
+    final progress = totalDays == 0
+        ? 0
+        : ((totals.present / totalDays) * 100).round().clamp(0, 100);
+
+    return GridView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        mainAxisExtent: 158,
+      ),
+      children: [
+        _MetricCard(
+          label: 'DAYS PRESENT',
+          value: '${totals.present}',
+          suffix: '/ $totalDays',
+          sub: 'This month · $progress% complete',
+          icon: Icons.calendar_month_outlined,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [EarthyTheme.forestOlive, EarthyTheme.deepOlive],
+          ),
+          labelBg: Colors.white.withValues(alpha: 0.15),
+          labelFg: const Color(0xFFE8EEDF),
+          valueColor: Colors.white,
+          subColor: const Color(0xFFDCE4D5),
+          iconColor: Colors.white70,
+        ),
+        _MetricCard(
+          label: 'HOURS WORKED',
+          value: _formatDuration(totals.workMinutes),
+          sub: 'Across ${totals.present} working days',
+          icon: Icons.access_time_rounded,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFFDF8), Color(0xFFF8EBD9)],
+          ),
+          borderColor: const Color(0xFFE8D4B9),
+          labelBg: Colors.white,
+          labelBorder: EarthyTheme.amberBorder,
+          labelFg: EarthyTheme.amberDark,
+          valueColor: EarthyTheme.text900,
+          subColor: EarthyTheme.text600,
+          iconColor: EarthyTheme.amber,
+        ),
+        _MetricCard(
+          label: 'LEAVES TAKEN',
+          value: '${totals.leave}',
+          suffix: 'days',
+          sub: 'Approved leave this month',
+          icon: Icons.event_busy_rounded,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFF8F5), Color(0xFFFCE5DC)],
+          ),
+          borderColor: const Color(0xFFF3C9BB),
+          labelBg: Colors.white,
+          labelBorder: EarthyTheme.terracottaBorder,
+          labelFg: EarthyTheme.rust,
+          valueColor: EarthyTheme.rust,
+          subColor: EarthyTheme.text600,
+          iconColor: EarthyTheme.terracotta,
+        ),
+        _MetricCard(
+          label: 'HALF DAYS',
+          value: '${totals.half}',
+          suffix: 'days',
+          sub: 'Partial attendance',
+          icon: Icons.timelapse_rounded,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white, Color(0xFFF0F5EB)],
+          ),
+          borderColor: EarthyTheme.sageBorder,
+          labelBg: Colors.white,
+          labelBorder: EarthyTheme.sageBorder,
+          labelFg: EarthyTheme.oliveText,
+          valueColor: EarthyTheme.text900,
+          subColor: EarthyTheme.text600,
+          iconColor: EarthyTheme.forestOlive,
+        ),
+      ],
+    );
+  }
+
+  /* ----------------------------- HISTORY ----------------------------- */
+
+  Widget _buildHistoryCard(AttendanceState state) {
+    final allDays = state.monthData?.days ?? const <AttendanceDaySummary>[];
+    final days = allDays.where(_matches).toList();
+    final loadingFirst = state.monthStatus == AttendanceLoadStatus.loading &&
+        state.monthData == null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: EarthyTheme.creamCanvas,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: EarthyTheme.border2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.white, Color(0xFFFAF7F0)],
+              ),
+              border: Border(bottom: BorderSide(color: EarthyTheme.border2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: EarthyTheme.forestOlive,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.table_chart_outlined,
+                      color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Attendance history',
+                        style: TextStyle(
+                          color: EarthyTheme.text900,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Daily summaries and punch details',
+                        style: TextStyle(color: EarthyTheme.text600, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                if (state.monthStatus == AttendanceLoadStatus.loading)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: EarthyTheme.forestOlive,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                if (loadingFirst)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: CircularProgressIndicator(color: EarthyTheme.forestOlive),
+                  )
+                else if (state.monthStatus == AttendanceLoadStatus.failure &&
+                    state.monthData == null)
+                  _errorCard(
+                    state.monthError ?? 'Unable to load attendance.',
+                    onRetry: _loadMonth,
+                  )
+                else ...[
+                  if (state.monthError != null) ...[
+                    _errorCard(state.monthError!, onRetry: _loadMonth),
+                    const SizedBox(height: 10),
+                  ],
+                  if (days.isEmpty &&
+                      state.monthStatus == AttendanceLoadStatus.success)
+                    _emptyCard(
+                      'No attendance records found for '
+                      '${_monthName(_month.month)} ${_month.year}.',
+                    ),
+                  ...days.map(
+                    (day) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _dayCard(day, state),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAF7F0),
+              border: Border(top: BorderSide(color: EarthyTheme.border2)),
+            ),
+            child: Text.rich(
+              TextSpan(
+                style: const TextStyle(fontSize: 14, color: EarthyTheme.text600),
+                children: [
+                  const TextSpan(text: 'Showing '),
+                  TextSpan(
+                    text: '${days.isEmpty ? 0 : 1}–${days.length}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: EarthyTheme.textDark,
+                    ),
+                  ),
+                  const TextSpan(text: ' of '),
+                  TextSpan(
+                    text: '${days.length}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: EarthyTheme.textDark,
+                    ),
+                  ),
+                  const TextSpan(text: ' records'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dayCard(AttendanceDaySummary day, AttendanceState state) {
+    final date = day.workDate;
+    final dateKey = date == null ? '' : _dateKey(date);
+    final selected = state.selectedDate == dateKey && dateKey.isNotEmpty;
+    final isWeekend = date != null &&
+        (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday);
+    final isWeekStart = date != null && date.weekday == DateTime.monday;
+    final showRegularization = _shouldShowRegularization(day);
+    final showLopActions = _hasLop(day);
+
+    final Color bg;
+    final Color bd;
+    if (selected) {
+      bg = EarthyTheme.sageBackground;
+      bd = EarthyTheme.sage;
+    } else if (isWeekend) {
+      bg = EarthyTheme.weekendBg;
+      bd = EarthyTheme.weekendBorder;
+    } else if (isWeekStart) {
+      bg = EarthyTheme.weekStartBg;
+      bd = EarthyTheme.weekStartBorder;
+    } else {
+      bg = Colors.white;
+      bd = EarthyTheme.borderSand;
+    }
+
+    // Punch log only exists for the day that was last loaded.
+    final dayData = state.dayData;
+    final logs = (dayData != null && dayData.date == dateKey)
+        ? dayData.punches
+            .map((p) => '${_formatTime(p.punchedAt)} (${p.direction})')
+            .toList()
+        : const <String>[];
+    final expanded = _expandedLog == dateKey;
+    final shownLogs = expanded ? logs : logs.take(2).toList();
+
+    final flags = <String>[
+      if (day.isLate) 'Late',
+      if (day.needsRegularization) 'Needs review',
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: bd, width: 2),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: date == null ? null : () => _loadDay(date),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _dateBadge(date)),
+                    _statusPill(day.status),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: EarthyTheme.headerBeige,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: EarthyTheme.border2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _punchTime(true, _formatTime(day.firstIn)),
+                      const SizedBox(height: 10),
+                      _punchTime(false, _formatTime(day.lastOut)),
+                      if (showRegularization) ...[
+                        const SizedBox(height: 10),
+                        _actionBtn(
+                          'Apply regularization',
+                          () => _openRequest(
+                            AttendanceRequestType.regularization,
+                            date,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: EarthyTheme.border2),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Total work duration',
+                              style: TextStyle(
+                                color: EarthyTheme.text600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              _formatDuration(day.workMinutes),
+                              style: const TextStyle(
+                                color: EarthyTheme.text900,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'View duration breakdown',
+                        onPressed: date == null ? null : () => _loadDay(date),
+                        icon: const Icon(Icons.visibility_outlined,
+                            color: EarthyTheme.forestOlive),
+                      ),
+                    ],
+                  ),
+                ),
+                if (logs.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const _Eyebrow('PUNCH LOG'),
+                  const SizedBox(height: 4),
+                  ...shownLogs.map(
+                    (l) => Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Text(
+                        l,
+                        style: const TextStyle(
+                          color: EarthyTheme.text700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (logs.length > 2)
+                    GestureDetector(
+                      onTap: () =>
+                          setState(() => _expandedLog = expanded ? null : dateKey),
+                      child: Text(
+                        expanded ? 'Show less' : 'Show ${logs.length - 2} more',
+                        style: const TextStyle(
+                          color: EarthyTheme.forestOlive,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: EarthyTheme.borderSand),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(
+                            text: 'LOP ',
+                            style: TextStyle(
+                              color: EarthyTheme.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          TextSpan(
+                            text: showLopActions ? day.lopValue : '-',
+                            style: TextStyle(
+                              color: showLopActions
+                                  ? EarthyTheme.terracotta
+                                  : EarthyTheme.text700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (showLopActions)
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          _actionBtn(
+                            'Apply Leave',
+                            () => _openRequest(AttendanceRequestType.leave, date),
+                          ),
+                          _actionBtn(
+                            'Permission',
+                            () => _openRequest(
+                              AttendanceRequestType.permission,
+                              date,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+                if (flags.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: flags.map(_flagChip).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /* --------------------------- DAY POPUP SHEET ----------------------- */
+
+  void _showDayPopup(AttendanceDayData data) {
+    final date = DateTime.tryParse(data.date);
+    final dayState = AttendanceState(
+      dayStatus: AttendanceLoadStatus.success,
+      selectedDate: data.date,
+      dayData: data,
+    );
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.86,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: EarthyTheme.creamCanvas,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            border: Border(
+              top: BorderSide(color: EarthyTheme.borderSand, width: 1.5),
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: EarthyTheme.forestOlive.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 14, 14, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _Eyebrow('SHIFT AUDIT LOG', color: EarthyTheme.sage),
+                          const SizedBox(height: 2),
+                          Text(
+                            date == null
+                                ? 'Attendance Details'
+                                : '${_weekdayName(date.weekday)}, ${data.date}',
+                            style: const TextStyle(
+                              color: EarthyTheme.text900,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: EarthyTheme.headerBeige,
+                        foregroundColor: EarthyTheme.textDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: EarthyTheme.borderSand),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                  child: _buildDayDetails(dayState),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+                decoration: const BoxDecoration(
+                  color: EarthyTheme.creamCanvas,
+                  border: Border(top: BorderSide(color: EarthyTheme.borderSand)),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: EarthyTheme.clay,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDayDetails(AttendanceState state) {
+    if (state.dayStatus == AttendanceLoadStatus.loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(color: EarthyTheme.forestOlive),
+        ),
+      );
+    }
+    if (state.dayStatus == AttendanceLoadStatus.failure) {
+      return _errorCard(
+        state.dayError ?? 'Unable to load day details.',
+        onRetry: () {
+          final selectedDate = state.selectedDate;
+          if (selectedDate != null) {
+            StoreProvider.of<AppState>(context)
+                .dispatch(FetchAttendanceDayAction(date: selectedDate));
+          }
+        },
+      );
+    }
+
+    final data = state.dayData;
+    if (data == null) return const SizedBox.shrink();
+    final summary = data.summary;
+
+    Widget sectionTitle(String t) => Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            t,
+            style: const TextStyle(
+              color: EarthyTheme.textDark,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Daily Metric Summary',
+                  style: TextStyle(
+                    color: EarthyTheme.textDark,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                data.date,
+                style: const TextStyle(
+                  color: EarthyTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (summary == null)
+            const Text(
+              'No day summary is available.',
+              style: TextStyle(color: EarthyTheme.textMuted, fontSize: 12),
+            )
+          else ...[
+            Row(
+              children: [
+                _statusPill(summary.status),
+                if (summary.lopValue != '0.00' && summary.lopValue != '0') ...[
+                  const SizedBox(width: 8),
+                  _lopChip(summary.lopValue),
+                ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: EarthyTheme.borderSand),
+              ),
+              child: Column(
+                children: [
+                  _detailPair('First in', _formatTime(summary.firstIn)),
+                  _detailPair('Last out', _formatTime(summary.lastOut)),
+                  _detailPair('Break time', _formatDuration(summary.breakMinutes),
+                      valueColor: EarthyTheme.amber),
+                  _detailPair(
+                    'Permission duration',
+                    _formatDuration(summary.permissionMinutes),
+                    valueColor: EarthyTheme.sage,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (data.sessions.isNotEmpty) ...[
+            const Divider(height: 28, color: EarthyTheme.borderSand),
+            sectionTitle('Recorded Sessions'),
+            ...data.sessions.map(
+              (session) => _detailPair(
+                session.flag ?? 'Session',
+                '${_formatTime(session.inAt)} – ${_formatTime(session.outAt)}'
+                '${session.durationMinutes == null ? '' : ' · ${_formatDuration(session.durationMinutes!)}'}',
+              ),
+            ),
+          ],
+          if (data.punches.isNotEmpty) ...[
+            const Divider(height: 28, color: EarthyTheme.borderSand),
+            sectionTitle('Biometric Punch Log'),
+            ...data.punches.map(
+              (punch) => _detailPair(
+                '${punch.direction}${punch.isCorrection ? ' · Correction' : ''}',
+                '${_formatTime(punch.punchedAt)}'
+                '${punch.sourceType.isEmpty ? '' : ' · ${punch.sourceType}'}',
+              ),
+            ),
+          ],
+          if (data.breakGaps.isNotEmpty) ...[
+            const Divider(height: 28, color: EarthyTheme.borderSand),
+            sectionTitle('Break Gaps'),
+            ...data.breakGaps.indexed.map(
+              (entry) => _detailPair(
+                'Break ${entry.$1 + 1}',
+                _formatAttributes(entry.$2),
+              ),
+            ),
+          ],
+          if (data.permissions.isNotEmpty) ...[
+            const Divider(height: 28, color: EarthyTheme.borderSand),
+            sectionTitle('Permissions'),
+            ...data.permissions.indexed.map(
+              (entry) => _detailPair(
+                'Permission ${entry.$1 + 1}',
+                _formatAttributes(entry.$2),
+              ),
+            ),
+          ],
+          if (data.flags.needsRegularization ||
+              data.flags.isLate ||
+              data.flags.excessBreak ||
+              data.flags.isLocked) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (data.flags.needsRegularization)
+                  _flagChip('Needs regularization'),
+                if (data.flags.isLate) _flagChip('Late punch'),
+                if (data.flags.excessBreak) _flagChip('Excess break'),
+                if (data.flags.isLocked) _flagChip('Record locked'),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detailPair(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: EarthyTheme.text600,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: valueColor ?? EarthyTheme.textDark,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* ----------------------------- SMALL PIECES ------------------------ */
+
+  Widget _dateBadge(DateTime? date) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: EarthyTheme.forestOlive,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 4,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                date == null ? '—' : date.day.toString().padLeft(2, '0'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                date == null ? '' : _weekdayShort(date.weekday),
+                style: const TextStyle(
+                  color: Color(0xFFD8DEC7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                date == null ? '' : '${_monthName(date.month)} ${date.year}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: EarthyTheme.text900,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                date == null ? 'Date unavailable' : _weekdayName(date.weekday),
+                style: const TextStyle(
+                  color: EarthyTheme.text600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _punchTime(bool isIn, String value) {
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isIn ? EarthyTheme.oliveBg2 : const Color(0xFFFDF3E7),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isIn ? const Color(0xFFD6E2CF) : const Color(0xFFF0DCBE),
+            ),
+          ),
+          child: Text(
+            isIn ? 'IN' : 'OUT',
+            style: TextStyle(
+              color: isIn ? EarthyTheme.forestOlive : EarthyTheme.amber,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          value,
+          style: const TextStyle(
+            color: EarthyTheme.text900,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statusPill(String status) {
+    final upper = status.toUpperCase();
+    final (Color fg, Color bg, Color border) = switch (upper) {
+      'PRESENT' || 'IN' => (
+          EarthyTheme.forestOlive,
+          EarthyTheme.sageBackground,
+          EarthyTheme.sageBorder,
+        ),
+      'LEAVE' || 'INSUFFICIENT' || 'ABSENT' || 'OUT' => (
+          EarthyTheme.terracotta,
+          EarthyTheme.terracottaBackground,
+          EarthyTheme.terracottaBorder,
+        ),
+      'WEEKLY_OFF' || 'HOLIDAY' => (
+          EarthyTheme.sage,
+          EarthyTheme.headerBeige,
+          EarthyTheme.borderSand,
+        ),
+      'HALF_DAY' => (
+          EarthyTheme.amber,
+          EarthyTheme.warmSandLight,
+          EarthyTheme.amberBorder,
+        ),
+      _ => (
+          EarthyTheme.textMuted,
+          EarthyTheme.headerBeige,
+          EarthyTheme.borderSand,
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _statusLabel(status),
+            style: TextStyle(
+              color: fg,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionBtn(String label, VoidCallback onTap) {
+    return Material(
+      color: EarthyTheme.clay,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _errorCard(String message, {required VoidCallback onRetry}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: EarthyTheme.terracottaBackground,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: EarthyTheme.terracottaBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: EarthyTheme.terracotta, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: EarthyTheme.terracotta,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text(
+              'Retry',
+              style: TextStyle(
+                color: EarthyTheme.terracotta,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyCard(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: EarthyTheme.text600,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _flagChip(String label) {
+    final isLate = label.toLowerCase().contains('late');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isLate ? EarthyTheme.terracottaBackground : EarthyTheme.warmSandLight,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isLate ? EarthyTheme.terracottaBorder : EarthyTheme.amberBorder,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isLate ? EarthyTheme.terracotta : EarthyTheme.amber,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _lopChip(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: EarthyTheme.terracottaBackground,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: EarthyTheme.terracottaBorder),
+      ),
+      child: Text(
+        'LOP $value',
+        style: const TextStyle(
+          color: EarthyTheme.terracotta,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() => BoxDecoration(
+        color: EarthyTheme.creamCanvas,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: EarthyTheme.borderSand),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF483C2D).withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reusable widgets                                                   */
+/* ------------------------------------------------------------------ */
+
+class _Eyebrow extends StatelessWidget {
+  const _Eyebrow(this.text, {this.color = EarthyTheme.forestOlive});
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.6,
+        ),
+      );
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.sub,
+    required this.icon,
+    required this.gradient,
+    required this.labelBg,
+    required this.labelFg,
+    required this.valueColor,
+    required this.subColor,
+    required this.iconColor,
+    this.suffix,
+    this.borderColor,
+    this.labelBorder,
+  });
+
+  final String label, value, sub;
+  final String? suffix;
+  final IconData icon;
+  final Gradient gradient;
+  final Color labelBg, labelFg, valueColor, subColor, iconColor;
+  final Color? borderColor, labelBorder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(18),
+        border: borderColor == null ? null : Border.all(color: borderColor!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: labelBg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: labelBorder == null
+                        ? null
+                        : Border.all(color: labelBorder!),
+                  ),
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: labelFg,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(icon, size: 18, color: iconColor),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: value,
+                      style: TextStyle(
+                        color: valueColor,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (suffix != null)
+                      TextSpan(
+                        text: ' $suffix',
+                        style: TextStyle(
+                          color: valueColor.withValues(alpha: 0.6),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sub,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: subColor, fontSize: 12.5),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Organic curves behind the main canvas
+class _AbstractOrganicPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    Paint fill(Color c) => Paint()
+      ..color = c
+      ..style = PaintingStyle.fill;
+
+    // olive – top left
+    canvas.drawPath(
+      Path()
+        ..moveTo(-20, -20)
+        ..cubicTo(w * .35, -30, w * .55, h * .06, w * .45, h * .16)
+        ..cubicTo(w * .30, h * .26, w * .05, h * .24, -20, h * .30)
+        ..close(),
+      fill(EarthyTheme.sageLight),
+    );
+    // sand – top right
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * .65, -20)
+        ..cubicTo(w * .75, h * .05, w * .9, h * .10, w + 20, h * .08)
+        ..lineTo(w + 20, -20)
+        ..close(),
+      fill(EarthyTheme.warmSand),
+    );
+    // sand – right middle
+    canvas.drawPath(
+      Path()
+        ..moveTo(w + 20, h * .35)
+        ..cubicTo(w * .85, h * .38, w * .82, h * .46, w * .92, h * .55)
+        ..cubicTo(w * .97, h * .60, w + 20, h * .62, w + 20, h * .62)
+        ..close(),
+      fill(const Color(0xFFD9B288)),
+    );
+    // terracotta – bottom right
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * .55, h + 20)
+        ..cubicTo(w * .70, h * .88, w * .85, h * .80, w + 20, h * .78)
+        ..lineTo(w + 20, h + 20)
+        ..close(),
+      fill(EarthyTheme.terracotta),
+    );
+    // fine line
+    canvas.drawPath(
+      Path()
+        ..moveTo(-20, h * .45)
+        ..cubicTo(w * .3, h * .38, w * .6, h * .55, w + 20, h * .30),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = EarthyTheme.sage.withValues(alpha: 0.35),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+bool _shouldShowRegularization(AttendanceDaySummary day) {
+  final s = day.status.toUpperCase();
+  if (s == 'WEEKLY_OFF' || s == 'HOLIDAY' || s == 'LEAVE') {
+    return day.needsRegularization;
+  }
+  return day.needsRegularization || day.firstIn == null || day.lastOut == null;
+}
+
+bool _hasLop(AttendanceDaySummary day) =>
+    (double.tryParse(day.lopValue) ?? 0) > 0;
+
+String _dateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+String _statusLabel(String status) => status
+    .toLowerCase()
+    .split('_')
+    .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+    .join(' ');
+
+String _formatTime(DateTime? date) {
+  if (date == null) return '—';
+  final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+  final minute = date.minute.toString().padLeft(2, '0');
+  final period = date.hour < 12 ? 'AM' : 'PM';
+  return '$hour:$minute $period';
+}
+
+String _formatDuration(int minutes) {
+  if (minutes <= 0) return '0m';
+  final hours = minutes ~/ 60;
+  final remaining = minutes % 60;
+  if (hours == 0) return '${remaining}m';
+  if (remaining == 0) return '${hours}h';
+  return '${hours}h ${remaining}m';
+}
+
+String _formatAttributes(Map<String, dynamic> attributes) {
+  final values = attributes.entries
+      .where((entry) => entry.value != null)
+      .map((entry) => '${entry.key.replaceAll('_', ' ')}: ${entry.value}')
+      .take(3)
+      .toList();
+  return values.isEmpty ? '—' : values.join(' · ');
+}
+
+String _monthName(int month) => const [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ][month - 1];
+
+String _weekdayName(int weekday) => const [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ][weekday - 1];
+
+String _weekdayShort(int weekday) =>
+    const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][weekday - 1];

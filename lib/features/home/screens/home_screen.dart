@@ -11,6 +11,8 @@ import '../../../core/widgets/modern_curved_bottom_nav.dart';
 import '../../../redux/app_state.dart';
 import '../../attendance/screens/attendance_screen.dart';
 import '../../auth/redux/auth_actions.dart';
+import '../../calendar/screens/holiday_calendar_screen.dart';
+import '../../payslips/screens/payslip_screen.dart';
 import '../models/dashboard_model.dart';
 import '../services/dashboard_service.dart';
 import '../../requests/screens/request_screen.dart';
@@ -110,6 +112,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentBottomNavIndex = 0;
   bool _hasOpenedAttendance = false;
+  bool _hasOpenedCalendar = false;
+  bool _hasOpenedPayslips = false;
 
   // --- Mood & Quote State ---
   int? _selectedMoodIndex;
@@ -254,19 +258,26 @@ Widget build(BuildContext context) {
             const RequestsScreen(),
 
             // 3. Calendar
-            _buildSectionPage(
-              title: 'Calendar',
-              description:
-                  'Your shifts and important dates will appear here.',
-              icon: Icons.calendar_month_rounded,
-            ),
+            _hasOpenedCalendar
+                ? StoreConnector<AppState, String?>(
+                    distinct: true,
+                    converter: (store) => store.state.auth.token,
+                    builder: (context, token) =>
+                        HolidayCalendarScreen(token: token),
+                  )
+                : const SizedBox.shrink(),
 
             // 4. Payslip
-            _buildSectionPage(
-              title: 'Payslip',
-              description: 'Your payslips will appear here.',
-              icon: Icons.account_balance_wallet_outlined,
-            ),
+            _hasOpenedPayslips
+                ? StoreConnector<AppState, String?>(
+                    distinct: true,
+                    converter: (store) => store.state.auth.token,
+                    builder: (context, token) => PayslipScreen(
+                      token: token,
+                      active: _currentBottomNavIndex == 4,
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ],
         ),
       ],
@@ -281,6 +292,8 @@ Widget build(BuildContext context) {
     setState(() {
       _currentBottomNavIndex = index;
       if (index == 1) _hasOpenedAttendance = true;
+      if (index == 3) _hasOpenedCalendar = true;
+      if (index == 4) _hasOpenedPayslips = true;
     });
   }
 
@@ -370,76 +383,6 @@ Widget build(BuildContext context) {
             onPressed: _retryDashboard,
             style: TextButton.styleFrom(foregroundColor: SomaflowTheme.lopCoral),
             child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionPage({
-    required String title,
-    required String description,
-    required IconData icon,
-  }) {
-    return SafeArea(
-      child: Column(
-        children: [
-          _buildTopAppBar(null),
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
-                  decoration: BoxDecoration(
-                    color: SomaflowTheme.cardFrosted,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: SomaflowTheme.borderLight),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SomaflowTheme.sageDark.withValues(alpha: 0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 76,
-                        height: 76,
-                        decoration: BoxDecoration(
-                          color: SomaflowTheme.sageWash,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Icon(icon, size: 36, color: SomaflowTheme.sagePrimary),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: SomaflowTheme.textCharcoal,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        description,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: SomaflowTheme.textMuted,
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
