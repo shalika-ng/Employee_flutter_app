@@ -1008,7 +1008,7 @@ Widget build(BuildContext context) {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4.0, bottom: 12.0),
+          padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1016,14 +1016,14 @@ Widget build(BuildContext context) {
                 'Monthly Cadence',
                 style: TextStyle(
                   color: SomaflowTheme.textCharcoal,
-                  fontSize: 15,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               Text(
                 monthLabel,
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w600,
                   color: SomaflowTheme.textMuted,
                 ),
@@ -1033,11 +1033,11 @@ Widget build(BuildContext context) {
         ),
         GridView.count(
           crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: 6,
+          mainAxisSpacing: 6,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.34,
+          childAspectRatio: 1.78,
           children: [
             _buildSnapshotCard(
               label: 'ATTENDANCE',
@@ -1109,8 +1109,19 @@ Widget build(BuildContext context) {
     IconData? footerIcon,
   }) {
     return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: _cardDecoration(),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: SomaflowTheme.cardTinted,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SomaflowTheme.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: SomaflowTheme.sageDark.withValues(alpha: 0.025),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1124,27 +1135,27 @@ Widget build(BuildContext context) {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 8.3,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+                    letterSpacing: 0.45,
                     color: SomaflowTheme.sageDeep,
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 3),
               Container(
-                constraints: const BoxConstraints(maxWidth: 90),
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                constraints: const BoxConstraints(maxWidth: 76),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: badgeColor,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   badgeText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 8,
                     fontWeight: FontWeight.w800,
                     color: badgeTextColor,
                   ),
@@ -1158,15 +1169,19 @@ Widget build(BuildContext context) {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: SomaflowTheme.textCharcoal,
-              fontSize: 16.5,
+              fontSize: 13,
               fontWeight: FontWeight.w900,
             ),
           ),
           Row(
             children: [
               if (footerIcon != null) ...[
-                const Icon(Icons.circle, size: 6, color: SomaflowTheme.statusGreen),
-                const SizedBox(width: 5),
+                const Icon(
+                  Icons.circle,
+                  size: 4,
+                  color: SomaflowTheme.statusGreen,
+                ),
+                const SizedBox(width: 3),
               ],
               Expanded(
                 child: Text(
@@ -1174,7 +1189,7 @@ Widget build(BuildContext context) {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 8.1,
                     color: SomaflowTheme.textMuted,
                     fontWeight: FontWeight.w600,
                   ),

@@ -190,23 +190,23 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         },
                         child: ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                           children: [
                             if (state.monthData != null) ...[
                               _buildEmployeeCard(state.monthData!.employee),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 10),
                             ],
                             _buildMonthSelector(),
                             if (state.monthData != null) ...[
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 10),
                               _buildTodayCard(state.monthData!.today),
-                              const SizedBox(height: 18),
+                              const SizedBox(height: 12),
                               _buildSummary(
                                 state.monthData!.totals,
                                 state.monthData!.days.length,
                               ),
                             ],
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 14),
                             _buildAttendanceList(state),
                           ],
                         ),
@@ -290,19 +290,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildEmployeeCard(AttendanceEmployee employee) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [SomaflowTheme.sagePrimary, SomaflowTheme.sageDeep],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: SomaflowTheme.sageDeep.withValues(alpha: 0.26),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -316,8 +316,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             child: Opacity(
               opacity: 0.12,
               child: Container(
-                width: 140,
-                height: 140,
+                width: 108,
+                height: 108,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 20),
@@ -337,13 +337,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ),
                 ),
                 child: CircleAvatar(
-                  radius: 24,
+                  radius: 18,
                   backgroundColor: Colors.white.withValues(alpha: 0.2),
-                  child: const Icon(Icons.person_rounded,
-                      color: Colors.white, size: 26),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,24 +360,26 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 18,
+                              fontSize: 15,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 5),
-                        const Icon(Icons.verified_rounded,
-                            size: 16, color: Colors.white),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.verified_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 2),
                     Text(
                       '${employee.designation} · ${employee.empCode}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 13,
+                        fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -382,10 +387,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.06),
@@ -398,17 +403,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     CircleAvatar(
-                      radius: 3.5,
+                      radius: 2.5,
                       backgroundColor: SomaflowTheme.statusGreen,
                     ),
-                    SizedBox(width: 5),
+                    SizedBox(width: 4),
                     Text(
                       'ACTIVE',
                       style: TextStyle(
                         color: SomaflowTheme.statusGreen,
-                        fontSize: 11,
+                        fontSize: 9,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 0.6,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
@@ -425,7 +430,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildMonthSelector() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: _cardDecoration(),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -433,19 +438,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           IconButton(
             tooltip: 'Previous month',
             onPressed: () => _changeMonth(-1),
-            icon: const Icon(Icons.chevron_left_rounded, size: 28),
+            icon: const Icon(Icons.chevron_left_rounded, size: 24),
             color: SomaflowTheme.sagePrimary,
+            visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
           ),
           Row(
             children: [
-              const Icon(Icons.calendar_month_rounded,
-                  size: 20, color: SomaflowTheme.sagePrimary),
-              const SizedBox(width: 8),
+              const Icon(
+                Icons.calendar_month_rounded,
+                size: 16,
+                color: SomaflowTheme.sagePrimary,
+              ),
+              const SizedBox(width: 4),
               Text(
                 '${_monthName(_month.month)} ${_month.year}',
                 style: const TextStyle(
                   color: SomaflowTheme.textCharcoal,
-                  fontSize: 17,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -454,8 +464,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           IconButton(
             tooltip: 'Next month',
             onPressed: () => _changeMonth(1),
-            icon: const Icon(Icons.chevron_right_rounded, size: 28),
+            icon: const Icon(Icons.chevron_right_rounded, size: 24),
             color: SomaflowTheme.sagePrimary,
+            visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
           ),
         ],
       ),
@@ -466,7 +478,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildTodayCard(AttendanceToday today) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,36 +490,36 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 "TODAY'S PRESENCE",
                 style: TextStyle(
                   color: SomaflowTheme.sagePrimary,
-                  fontSize: 11.5,
+                  fontSize: 10.2,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 1.1,
+                  letterSpacing: 0.8,
                 ),
               ),
               _statusPill(today.status),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             _dateLabel(DateTime.now()),
             style: const TextStyle(
               color: SomaflowTheme.textCharcoal,
-              fontSize: 19,
+              fontSize: 15.5,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(13),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: SomaflowTheme.chipBackground,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: SomaflowTheme.borderLight),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
@@ -519,10 +531,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.fingerprint_rounded,
-                      color: SomaflowTheme.sagePrimary, size: 26),
+                  child: const Icon(
+                    Icons.fingerprint_rounded,
+                    color: SomaflowTheme.sagePrimary,
+                    size: 19,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,7 +546,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         'Last punch',
                         style: TextStyle(
                           color: SomaflowTheme.textCharcoal,
-                          fontSize: 15,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -539,7 +554,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         'Biometric Turnstile',
                         style: TextStyle(
                           color: SomaflowTheme.textMuted,
-                          fontSize: 13,
+                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -549,7 +564,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   _formatTime(today.lastPunch),
                   style: const TextStyle(
                     color: SomaflowTheme.sageDeep,
-                    fontSize: 17,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -569,18 +584,42 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         : ((totals.present / totalDays) * 100).round().clamp(0, 100);
 
     final items = <_Metric>[
-      _Metric('Present Days', '${totals.present}', '/$totalDays',
-          Icons.check_circle_outline_rounded, '$pct%',
-          SomaflowTheme.statusGreen, SomaflowTheme.statusGreenBg),
-      _Metric('Productive Hours', '${totals.workMinutes ~/ 60}h',
-          ' ${totals.workMinutes % 60}m', Icons.schedule_rounded, null,
-          SomaflowTheme.sagePrimary, SomaflowTheme.chipBackground),
-      _Metric('Leaves Taken', totals.leave.toString().padLeft(2, '0'), '',
-          Icons.event_busy_outlined, null,
-          SomaflowTheme.absentCoral, SomaflowTheme.absentBg),
-      _Metric('Half Days', totals.half.toString().padLeft(2, '0'), '',
-          Icons.hourglass_empty_rounded, null,
-          SomaflowTheme.halfDayAmber, SomaflowTheme.halfDayBg),
+      _Metric(
+        'Present Days',
+        '${totals.present}',
+        '/$totalDays',
+        Icons.check_circle_outline_rounded,
+        '$pct%',
+        SomaflowTheme.statusGreen,
+        SomaflowTheme.statusGreenBg,
+      ),
+      _Metric(
+        'Productive Hours',
+        '${totals.workMinutes ~/ 60}h',
+        ' ${totals.workMinutes % 60}m',
+        Icons.schedule_rounded,
+        null,
+        SomaflowTheme.sagePrimary,
+        SomaflowTheme.chipBackground,
+      ),
+      _Metric(
+        'Leaves Taken',
+        totals.leave.toString().padLeft(2, '0'),
+        '',
+        Icons.event_busy_outlined,
+        null,
+        SomaflowTheme.absentCoral,
+        SomaflowTheme.absentBg,
+      ),
+      _Metric(
+        'Half Days',
+        totals.half.toString().padLeft(2, '0'),
+        '',
+        Icons.hourglass_empty_rounded,
+        null,
+        SomaflowTheme.halfDayAmber,
+        SomaflowTheme.halfDayBg,
+      ),
     ];
 
     return Column(
@@ -601,14 +640,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           itemCount: items.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            mainAxisExtent: 118,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            mainAxisExtent: 92,
           ),
           itemBuilder: (context, index) {
             final m = items[index];
             return Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               decoration: _cardDecoration(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -618,18 +657,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        width: 34,
-                        height: 34,
+                        width: 26,
+                        height: 26,
                         decoration: BoxDecoration(
                           color: m.bg,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(m.icon, color: m.color, size: 19),
+                        child: Icon(m.icon, color: m.color, size: 15),
                       ),
                       if (m.badge != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: m.bg,
                             borderRadius: BorderRadius.circular(12),
@@ -638,7 +679,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             m.badge!,
                             style: TextStyle(
                               color: m.color,
-                              fontSize: 12,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -652,7 +693,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           text: m.value,
                           style: const TextStyle(
                             color: SomaflowTheme.textCharcoal,
-                            fontSize: 24,
+                            fontSize: 16.5,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -661,7 +702,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             text: m.suffix,
                             style: const TextStyle(
                               color: SomaflowTheme.textMuted,
-                              fontSize: 14,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -672,7 +713,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     m.label,
                     style: const TextStyle(
                       color: SomaflowTheme.textMuted,
-                      fontSize: 13,
+                      fontSize: 10.8,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -779,7 +820,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         color: SomaflowTheme.surfaceCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: selected ? SomaflowTheme.sagePrimary : SomaflowTheme.borderLight,
+          color: selected
+              ? SomaflowTheme.sagePrimary
+              : SomaflowTheme.borderLight,
           width: selected ? 1.6 : 1,
         ),
         boxShadow: [
@@ -832,48 +875,48 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     _statusPill(day.status),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: SomaflowTheme.chipBackground,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Wrap(
-                    spacing: 14,
-                    runSpacing: 6,
+                  child: Row(
                     children: [
-                      Text(
-                        'IN  ${_formatTime(day.firstIn)}',
-                        style: const TextStyle(
-                          color: SomaflowTheme.sageDeep,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                      Expanded(
+                        child: _metricTile(
+                          'IN',
+                          _formatTime(day.firstIn),
+                          SomaflowTheme.sageDeep,
                         ),
                       ),
-                      Text(
-                        'OUT  ${_formatTime(day.lastOut)}',
-                        style: const TextStyle(
-                          color: SomaflowTheme.textMuted,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _metricTile(
+                          'OUT',
+                          _formatTime(day.lastOut),
+                          SomaflowTheme.textMuted,
                         ),
                       ),
-                      Text(
-                        _formatDuration(day.workMinutes),
-                        style: const TextStyle(
-                          color: SomaflowTheme.sageDeep,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _metricTile(
+                          'HRS',
+                          _formatDuration(day.workMinutes),
+                          SomaflowTheme.sageDeep,
+                          textAlign: TextAlign.right,
                         ),
                       ),
                     ],
                   ),
                 ),
                 if (day.isLate || showLopActions) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
@@ -884,31 +927,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ),
                 ],
                 if (showRegularization || showLopActions) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (showRegularization)
-                        _requestAction(
-                          'Apply Regularization',
-                          AttendanceRequestType.regularization,
-                          date,
-                          isSolid: true,
-                        ),
-                      if (showLopActions) ...[
-                        _requestAction(
-                          'Apply Leave',
-                          AttendanceRequestType.leave,
-                          date,
-                        ),
-                        _requestAction(
-                          'Permission',
-                          AttendanceRequestType.permission,
-                          date,
-                        ),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        if (showRegularization)
+                          _requestAction(
+                            'Regularize',
+                            AttendanceRequestType.regularization,
+                            date,
+                            isSolid: true,
+                          ),
+                        if (showRegularization && showLopActions)
+                          const SizedBox(width: 6),
+                        if (showLopActions) ...[
+                          _requestAction(
+                            'Leave',
+                            AttendanceRequestType.leave,
+                            date,
+                          ),
+                          const SizedBox(width: 6),
+                          _requestAction(
+                            'Permission',
+                            AttendanceRequestType.permission,
+                            date,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ],
               ],
@@ -1007,7 +1054,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
                 decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: SomaflowTheme.borderLight)),
+                  border: Border(
+                    top: BorderSide(color: SomaflowTheme.borderLight),
+                  ),
                 ),
                 child: SizedBox(
                   width: double.infinity,
@@ -1023,7 +1072,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                     child: const Text(
                       'Close',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
@@ -1062,16 +1114,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final summary = data.summary;
 
     Widget title(String t) => Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Text(
-            t,
-            style: const TextStyle(
-              color: SomaflowTheme.textCharcoal,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        );
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        t,
+        style: const TextStyle(
+          color: SomaflowTheme.textCharcoal,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1144,7 +1196,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               (punch) => _detailPair(
                 '${punch.direction}${punch.isCorrection ? ' · Correction' : ''}',
                 '${_formatTime(punch.punchedAt)}'
-                '${punch.sourceType.isEmpty ? '' : ' · ${punch.sourceType}'}',
+                    '${punch.sourceType.isEmpty ? '' : ' · ${punch.sourceType}'}',
               ),
             ),
           ],
@@ -1159,8 +1211,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             const Divider(height: 28, color: SomaflowTheme.borderLight),
             title('Permissions'),
             ...data.permissions.indexed.map(
-              (e) =>
-                  _detailPair('Permission ${e.$1 + 1}', _formatAttributes(e.$2)),
+              (e) => _detailPair(
+                'Permission ${e.$1 + 1}',
+                _formatAttributes(e.$2),
+              ),
             ),
           ],
           if (data.flags.needsRegularization ||
@@ -1243,7 +1297,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
@@ -1253,9 +1307,42 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _statusLabel(status),
         style: TextStyle(
           color: fg,
-          fontSize: 12.5,
+          fontSize: 11.5,
           fontWeight: FontWeight.w800,
         ),
+      ),
+    );
+  }
+
+  Widget _metricTile(
+    String label,
+    String value,
+    Color valueColor, {
+    TextAlign textAlign = TextAlign.left,
+  }) {
+    return RichText(
+      textAlign: textAlign,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '$label ',
+            style: const TextStyle(
+              color: SomaflowTheme.textMuted,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              color: valueColor,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1266,29 +1353,25 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     DateTime? date, {
     bool isSolid = false,
   }) {
-    return ElevatedButton.icon(
+    return ElevatedButton(
       onPressed: date == null ? null : () => _openRequest(type, date),
-      icon: Icon(
-        type == AttendanceRequestType.regularization
-            ? Icons.edit_calendar_outlined
-            : type == AttendanceRequestType.leave
-                ? Icons.event_available_outlined
-                : Icons.description_outlined,
-        size: 16,
-      ),
-      label: Text(label),
       style: ElevatedButton.styleFrom(
         foregroundColor: isSolid ? Colors.white : SomaflowTheme.sageDeep,
-        backgroundColor:
-            isSolid ? SomaflowTheme.sagePrimary : SomaflowTheme.chipBackground,
+        backgroundColor: isSolid
+            ? SomaflowTheme.sagePrimary
+            : SomaflowTheme.chipBackground,
         elevation: isSolid ? 1 : 0,
         side: isSolid
             ? BorderSide.none
             : const BorderSide(color: SomaflowTheme.borderLight),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: const VisualDensity(horizontal: -1, vertical: -1),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      child: Text(label),
     );
   }
 
@@ -1340,8 +1423,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline,
-              color: SomaflowTheme.absentCoral, size: 22),
+          const Icon(
+            Icons.error_outline,
+            color: SomaflowTheme.absentCoral,
+            size: 22,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1387,17 +1473,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   BoxDecoration _cardDecoration() => BoxDecoration(
-        color: SomaflowTheme.surfaceCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: SomaflowTheme.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      );
+    color: SomaflowTheme.surfaceCard,
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: SomaflowTheme.borderLight),
+    boxShadow: [
+      BoxShadow(
+        color: SomaflowTheme.sageDark.withValues(alpha: 0.04),
+        blurRadius: 10,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  );
 }
 
 class _Metric {
@@ -1431,16 +1517,28 @@ class _SomaflowBackgroundPainter extends CustomPainter {
     canvas.drawPath(
       Path()
         ..moveTo(0, 0)
-        ..cubicTo(size.width * 0.45, 0, size.width * 0.55, size.height * 0.18, 0,
-            size.height * 0.28)
+        ..cubicTo(
+          size.width * 0.45,
+          0,
+          size.width * 0.55,
+          size.height * 0.18,
+          0,
+          size.height * 0.28,
+        )
         ..close(),
       paintSage,
     );
     canvas.drawPath(
       Path()
         ..moveTo(size.width * 0.5, 0)
-        ..cubicTo(size.width * 0.75, size.height * 0.08, size.width,
-            size.height * 0.04, size.width, size.height * 0.20)
+        ..cubicTo(
+          size.width * 0.75,
+          size.height * 0.08,
+          size.width,
+          size.height * 0.04,
+          size.width,
+          size.height * 0.20,
+        )
         ..lineTo(size.width, 0)
         ..close(),
       paintSand,
@@ -1516,26 +1614,26 @@ String _formatAttributes(Map<String, dynamic> attributes) {
 }
 
 String _monthName(int month) => const [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ][month - 1];
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+][month - 1];
 
 String _weekdayName(int weekday) => const [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ][weekday - 1];
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+][weekday - 1];
